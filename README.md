@@ -1,3 +1,9 @@
+<p align="center">
+  <img src="assets/logo.png" alt="DEUS MACHINA | TOOLS logo" width="180">
+</p>
+
+
+
 # DEUS-MACHINA-TOOLS
 Private-use multitools suite. Work in progress.
 
