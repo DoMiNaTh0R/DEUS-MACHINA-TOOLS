@@ -8,7 +8,7 @@
 Private-use multitools suite. Work in progress.
 
 
-============= DEUS MACHINA | TOOLS =============
+====== DEUS MACHINA | TOOLS ======
 =============
 
 DESCRIPCIÓN
@@ -187,7 +187,7 @@ Kevin González (DoMiNaTh0R)
 ENGLISH VERSION:
 
 
-=============DEUS MACHINA | TOOLS=============
+====== DEUS MACHINA | TOOLS ======
 =============
 
 DESCRIPTION
