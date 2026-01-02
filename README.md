@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/logo.png" alt="DEUS MACHINA | TOOLS logo" width="180">
+  <img src="logo.png" alt="DEUS MACHINA | TOOLS logo" width="180">
 </p>
 
 
