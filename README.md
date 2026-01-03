@@ -1,15 +1,15 @@
 <p align="center">
-  <img src="logo.png" alt="DEUS MACHINA | TOOLS logo" width="180">
+  <img src="logo.png" width="180">
+</p>
+
+<h1 align="center">DEUS MACHINA | TOOLS</h1>
+
+<p align="center">
+Private-use multitools suite. Work in progress.
 </p>
 
 
-
-# DEUS-MACHINA-TOOLS
-Private-use multitools suite. Work in progress.
-
-
-====== DEUS MACHINA | TOOLS ======
-=============
+<h1 align="center">====== DEUS MACHINA | TOOLS ======</h1>
 
 DESCRIPCIÓN
 -----------
@@ -187,8 +187,7 @@ Kevin González (DoMiNaTh0R)
 ENGLISH VERSION:
 
 
-====== DEUS MACHINA | TOOLS ======
-=============
+<h1 align="center">====== DEUS MACHINA | TOOLS ======</h1>
 
 DESCRIPTION
 -----------
