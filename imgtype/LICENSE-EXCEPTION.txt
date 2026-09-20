@@ -1,0 +1,98 @@
+PERMISO ADICIONAL CONFORME A LA SECCIÓN 7 DE LA GNU AGPL v3
+ADDITIONAL PERMISSION UNDER GNU AGPL VERSION 3 SECTION 7
+
+Programa / Program: DEUS MACHINA | TOOLS
+Titular / Copyright holder: Kevin González (DoMiNaTh0R)
+Fecha / Date: 19 de septiembre de 2026
+
+================================================================================
+ESPAÑOL
+================================================================================
+
+Como permiso adicional conforme a la sección 7 de la GNU Affero General Public
+License versión 3, el titular del copyright de DEUS MACHINA | TOOLS concede
+permiso para enlazar o combinar este programa —y cualquier obra derivada de él
+que se distribuya bajo la AGPLv3— con las bibliotecas propietarias de NVIDIA
+Corporation que forman los runtimes de CUDA y cuDNN, así como para distribuir
+la combinación resultante.
+
+Las bibliotecas cubiertas por este permiso son, en esta versión del programa:
+
+    CUDA 12.9.79        cublas64_12.dll
+                        cublasLt64_12.dll
+                        cudart64_12.dll
+
+    cuDNN 9.10.2.21     cudnn64_9.dll
+                        cudnn_adv64_9.dll
+                        cudnn_cnn64_9.dll
+                        cudnn_engines_precompiled64_9.dll
+                        cudnn_engines_runtime_compiled64_9.dll
+                        cudnn_graph64_9.dll
+                        cudnn_heuristic64_9.dll
+                        cudnn_ops64_9.dll
+
+y las versiones equivalentes de esas mismas bibliotecas en futuras versiones
+del programa.
+
+RECONOCIMIENTO EXPRESO: este permiso afecta únicamente a la licencia del código
+original de DEUS MACHINA | TOOLS. NVIDIA Corporation conserva íntegramente la
+titularidad y el control de la licencia de CUDA y cuDNN. Dichas bibliotecas se
+distribuyen exclusivamente en calidad de componentes redistribuibles
+autorizados por los términos de licencia de NVIDIA aplicables a la versión
+correspondiente de CUDA/cuDNN, permanecen sujetas a sus respectivas licencias
+(NVIDIA CUDA Toolkit EULA y NVIDIA cuDNN Software License Agreement) y NO
+quedan cubiertas ni relicenciadas por la AGPLv3. Quien redistribuya el programa
+debe seguir cumpliendo los términos de NVIDIA respecto de esas bibliotecas.
+
+    https://docs.nvidia.com/cuda/eula/index.html
+    https://docs.nvidia.com/deeplearning/cudnn/sla/index.html
+
+Si modificas este programa, puedes extender este permiso adicional a tu versión,
+pero no estás obligado a hacerlo. Si decides eliminarlo, debes borrar también
+esta nota de los archivos afectados.
+
+================================================================================
+ENGLISH
+================================================================================
+
+As an additional permission under section 7 of the GNU Affero General Public
+License version 3, the copyright holder of DEUS MACHINA | TOOLS grants
+permission to link or combine this program — and any derivative work of it
+distributed under the AGPLv3 — with the proprietary NVIDIA Corporation
+libraries that make up the CUDA and cuDNN runtimes, and to distribute the
+resulting combination.
+
+The libraries covered by this permission are, in this version of the program:
+
+    CUDA 12.9.79        cublas64_12.dll
+                        cublasLt64_12.dll
+                        cudart64_12.dll
+
+    cuDNN 9.10.2.21     cudnn64_9.dll
+                        cudnn_adv64_9.dll
+                        cudnn_cnn64_9.dll
+                        cudnn_engines_precompiled64_9.dll
+                        cudnn_engines_runtime_compiled64_9.dll
+                        cudnn_graph64_9.dll
+                        cudnn_heuristic64_9.dll
+                        cudnn_ops64_9.dll
+
+and the equivalent versions of those same libraries in future releases of the
+program.
+
+EXPRESS ACKNOWLEDGEMENT: this permission affects only the license of the
+original DEUS MACHINA | TOOLS code. NVIDIA Corporation fully retains ownership
+and control of the CUDA and cuDNN licensing. Those libraries are distributed
+solely as redistributable components authorized by the NVIDIA license terms
+applicable to the corresponding CUDA/cuDNN version, they remain subject to
+their respective licenses (NVIDIA CUDA Toolkit EULA and NVIDIA cuDNN Software
+License Agreement) and are NOT covered or relicensed by the AGPLv3. Anyone
+redistributing the program must still comply with NVIDIA's terms regarding
+those libraries.
+
+    https://docs.nvidia.com/cuda/eula/index.html
+    https://docs.nvidia.com/deeplearning/cudnn/sla/index.html
+
+If you modify this program, you may extend this additional permission to your
+version, but you are not obliged to do so. If you delete this permission, you
+must also remove this notice from the affected files.

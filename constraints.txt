@@ -1,0 +1,19 @@
+# Stack sensible de DEUS MACHINA (CUDA 12.9).
+# crear_venv_dmt.bat copia este archivo al venv y crea un pip.ini que lo aplica
+# siempre; asi los pip install que lanza la app (spotDL, yt-dlp) no mueven nada de esto.
+# yt-dlp y spotDL NO se fijan aqui a proposito: deben poder actualizarse.
+torch==2.8.0+cu129
+ctranslate2==4.8.2
+faster-whisper==1.2.1
+onnxruntime==1.30.0
+rapidocr==3.9.2
+paddlepaddle-gpu==3.3.1
+paddleocr==3.7.0
+paddlex==3.7.2
+# paddlex exige numpy<2.4 y PyYAML==6.0.2
+numpy==2.3.5
+PyYAML==6.0.2
+# Todas las distribuciones de OpenCV en la MISMA version (escriben en la misma carpeta cv2)
+opencv-python==4.10.0.84
+opencv-contrib-python==4.10.0.84
+opencv-python-headless==4.10.0.84

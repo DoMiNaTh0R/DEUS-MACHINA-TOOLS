@@ -1,0 +1,481 @@
+TÉRMINOS DE LICENCIA Y USO
+
+SOFTWARE: DEUS MACHINA | TOOLS (y todas sus versiones y actualizaciones futuras)
+VERSIÓN: 3.0
+AUTOR: Kevin González (DoMiNaTh0R)
+LICENCIA: GNU Affero General Public License, versión 3 (AGPL-3.0) o posterior
+CÓDIGO FUENTE: https://github.com/DoMiNaTh0R/DEUS-MACHINA-TOOLS
+FECHA DE ENTRADA EN VIGOR: 19 de septiembre de 2026
+
+Este documento resume, en lenguaje claro, tus derechos y obligaciones al usar
+este software. El texto legal que rige es la GNU Affero General Public License
+v3, incluida íntegramente en el archivo LICENSE (LICENSE.txt), junto con el
+permiso adicional de la sección 7 recogido en LICENSE-EXCEPTION.txt. En caso de
+discrepancia entre este resumen y la AGPL-3.0, prevalece la AGPL-3.0.
+
+Al instalar, copiar, descargar o usar el software aceptas los términos de la
+AGPL-3.0.
+
+
+1. LICENCIA DEL PROGRAMA
+
+1.1 DEUS MACHINA | TOOLS es SOFTWARE LIBRE. Se distribuye bajo la GNU Affero
+General Public License versión 3 o, a tu elección, cualquier versión posterior.
+
+1.2 Tienes derecho a:
+(a) usar el programa para cualquier finalidad, incluida la comercial, sin pagar
+    ninguna licencia;
+(b) estudiar cómo funciona y acceder a su código fuente completo;
+(c) modificarlo y adaptarlo a tus necesidades;
+(d) redistribuir copias, tal cual o modificadas.
+
+1.3 A cambio, si distribuyes el programa (modificado o no) debes:
+(a) conservar los avisos de copyright, de licencia y de garantía;
+(b) entregar o poner a disposición del destinatario el CÓDIGO FUENTE
+    CORRESPONDIENTE completo, incluidas tus modificaciones, bajo esta misma
+    licencia AGPL-3.0;
+(c) indicar de forma destacada que has modificado el programa y la fecha del
+    cambio;
+(d) no imponer restricciones adicionales sobre los derechos que la AGPL concede
+    a los destinatarios RESPECTO DEL CÓDIGO CUBIERTO POR ESTA LICENCIA. Los
+    componentes de terceros incluidos (NVIDIA, FFmpeg, Ghostscript, etc.)
+    conservan sus propias licencias, que siguen aplicándose en sus términos.
+
+1.4 USO A TRAVÉS DE UNA RED (sección 13 de la AGPL). Si modificas este programa
+y ofreces su funcionalidad a otras personas a través de una red (por ejemplo,
+como servicio web o remoto), debes ofrecer a esos usuarios, de forma destacada,
+el código fuente completo de tu versión modificada.
+
+1.5 POR QUÉ AGPL. Este programa enlaza directamente, dentro de su propio
+proceso, la librería PyMuPDF (MuPDF), publicada bajo AGPL-3.0. Por coherencia
+legal y por decisión del autor, todo el código original de DEUS MACHINA | TOOLS
+se publica también bajo AGPL-3.0.
+
+1.6 El código fuente correspondiente a cada versión distribuida está disponible
+públicamente en https://github.com/DoMiNaTh0R/DEUS-MACHINA-TOOLS y también se
+envía por correo electrónico a quien lo solicite a DoMiNaTh0RRoyale@gmail.com.
+
+
+2. PROPIEDAD INTELECTUAL, NOMBRE Y MARCAS
+
+2.1 El copyright del código original pertenece a Kevin González (DoMiNaTh0R).
+La licencia AGPL concede derechos de uso, modificación y redistribución, pero
+no transfiere la titularidad de los derechos de autor.
+
+2.2 El nombre "DEUS MACHINA | TOOLS", su logotipo, el icono y las imágenes
+propias de la aplicación identifican al proyecto original. Conforme a la
+sección 7(e) de la AGPL, no se autoriza usar ese nombre ni esos signos
+distintivos para promocionar o dar a entender el respaldo del autor en
+versiones modificadas: si publicas una versión modificada, hazlo bajo un nombre
+propio. Esta condición no restringe ninguno de los derechos de la AGPL sobre el
+código.
+
+
+3. COMPONENTES DE TERCEROS
+
+3.1 Programas externos (mera agregación)
+Los siguientes componentes se distribuyen junto al software como PROGRAMAS
+INDEPENDIENTES y se invocan como procesos externos. No forman una obra derivada
+del programa principal y cada uno se rige por su propia licencia:
+
+A. FFmpeg — GNU General Public License (GPL) v3
+   Conversión y procesamiento de video y audio. Se ejecuta como proceso externo
+   (CLI); no se enlaza estática ni dinámicamente con el programa principal.
+   Código fuente: https://ffmpeg.org/download.html
+
+B. Ghostscript — GNU Affero General Public License (AGPL) v3
+   Compresión y procesamiento de PDF. Se invoca exclusivamente mediante
+   llamadas al ejecutable gswin64c.exe.
+   Código fuente: https://ghostscript.com/
+
+3.2 Componentes enlazados
+
+C. PyMuPDF (fitz) — GNU Affero General Public License (AGPL) v3
+   Se enlaza DIRECTAMENTE como librería de Python dentro del proceso principal
+   del programa (lectura, renderizado y manipulación de PDF en los módulos de
+   PDF y de OCR). No es mera agregación: por eso el programa completo se
+   distribuye bajo AGPL-3.0 (ver punto 1.5).
+   Documentación y licencia: https://pymupdf.readthedocs.io/
+
+3.3 Bibliotecas de NVIDIA (CUDA / cuDNN)
+
+Este paquete incluye bibliotecas de enlace dinámico redistribuibles propiedad
+de NVIDIA Corporation, utilizadas únicamente para acelerar por hardware la
+transcripción (CTranslate2 / faster-whisper) y el OCR (PaddlePaddle).
+
+Versiones y archivos EXACTOS que se distribuyen con esta versión del programa:
+
+  CUDA 12.9.79        cublas64_12.dll
+                      cublasLt64_12.dll
+                      cudart64_12.dll
+
+  cuDNN 9.10.2.21     cudnn64_9.dll
+                      cudnn_adv64_9.dll
+                      cudnn_cnn64_9.dll
+                      cudnn_engines_precompiled64_9.dll
+                      cudnn_engines_runtime_compiled64_9.dll
+                      cudnn_graph64_9.dll
+                      cudnn_heuristic64_9.dll
+                      cudnn_ops64_9.dll
+
+"La distribución de estas bibliotecas se realiza exclusivamente en calidad de
+componentes redistribuibles autorizados por los términos de licencia de NVIDIA
+aplicables a la versión correspondiente de CUDA/cuDNN. Dichos componentes
+permanecen sujetos a sus respectivas licencias de NVIDIA y no forman parte de
+la licencia AGPLv3 aplicable al código original de DEUS MACHINA | TOOLS."
+
+PERMISO ADICIONAL CONFORME A LA SECCIÓN 7 DE LA AGPL v3: el titular del
+copyright concede permiso para enlazar o combinar este programa —y las obras
+derivadas que se distribuyan bajo la AGPLv3— con esas bibliotecas de NVIDIA, y
+para distribuir la combinación resultante. Este permiso NO relicencia dichas
+bibliotecas: NVIDIA Corporation conserva íntegramente el control y la
+titularidad de la licencia de CUDA y cuDNN. El texto completo del permiso está
+en el archivo LICENSE-EXCEPTION.txt, incluido con el programa.
+
+Términos aplicables de NVIDIA:
+https://docs.nvidia.com/cuda/eula/index.html
+https://docs.nvidia.com/deeplearning/cudnn/sla/index.html
+
+El Usuario no adquiere derechos de propiedad sobre estos componentes y debe
+respetar las condiciones de NVIDIA al redistribuirlos.
+
+3.4 Motores de IA y herramientas externas
+
+Según el módulo que uses, el software utiliza:
+- PaddleOCR, PaddlePaddle y PaddleX (Apache 2.0) y RapidOCR con ONNX Runtime
+  (Apache 2.0 / MIT) para el reconocimiento de texto. El motor de PaddleOCR se
+  ejecuta en un PROCESO INDEPENDIENTE.
+- faster-whisper y CTranslate2 (MIT), con los modelos Whisper de OpenAI (MIT),
+  para la transcripción.
+- rembg y el modelo u2net (MIT) para la eliminación de fondos.
+- yt-dlp (Unlicense), spotDL (MIT) y Deno (MIT) para la descarga de contenido;
+  se ejecutan como procesos externos.
+
+Algunos de estos componentes (modelos de Whisper, modelo u2net, Deno y spotDL)
+NO se incluyen en el instalador: el software los descarga automáticamente de
+sus repositorios oficiales la primera vez que se necesitan y quedan almacenados
+en el equipo del Usuario.
+
+3.5 Librerías de Python y otros componentes
+Los avisos de copyright y los textos completos de licencia de todos los
+componentes de terceros están en el archivo THIRD_PARTY_NOTICES.txt, incluido
+con el software.
+
+
+4. PRIVACIDAD Y USO DE DATOS
+
+4.1 El software funciona principalmente de forma local en el equipo del
+Usuario. No "llama a casa", no envía telemetría y el autor no recoge, procesa
+ni almacena datos personales ni de uso.
+
+4.2 Existen excepciones funcionales en las que se realiza una conexión:
+(a) Descarga de componentes: si usas una función cuyo componente no está
+    presente localmente (modelos de Whisper, modelo u2net, Deno o spotDL), el
+    software se conecta a repositorios públicos oficiales (Hugging Face, GitHub
+    o PyPI) únicamente para descargarlo a tu equipo. Las actualizaciones de
+    yt-dlp se descargan de PyPI y se verifican con su firma SHA-256 antes de
+    instalarse.
+(b) Funciones de red explícitas: la descarga de contenido multimedia requiere
+    conexión activa mientras se usa.
+
+4.3 En todos los casos la conexión es técnica y unidireccional (descarga de
+recursos) y no implica el envío de datos privados del Usuario al autor.
+
+
+5. AUSENCIA DE GARANTÍA (secciones 15 y 16 de la AGPL)
+
+5.1 EL PROGRAMA SE PROPORCIONA "TAL CUAL", SIN GARANTÍA DE NINGÚN TIPO, EXPRESA
+O IMPLÍCITA, INCLUIDAS —SIN LIMITACIÓN— LAS GARANTÍAS DE COMERCIABILIDAD E
+IDONEIDAD PARA UN PROPÓSITO PARTICULAR. TODO EL RIESGO EN CUANTO A LA CALIDAD Y
+AL RENDIMIENTO DEL PROGRAMA LO ASUME EL USUARIO.
+
+5.2 EN NINGÚN CASO, SALVO QUE LA LEY APLICABLE LO EXIJA, EL AUTOR O CUALQUIER
+PERSONA QUE MODIFIQUE O REDISTRIBUYA EL PROGRAMA SERÁ RESPONSABLE DE DAÑOS,
+INCLUIDOS DAÑOS GENERALES, ESPECIALES, INCIDENTALES O CONSECUENTES DERIVADOS
+DEL USO O DE LA IMPOSIBILIDAD DE USAR EL PROGRAMA (INCLUIDA LA PÉRDIDA DE
+DATOS, LA PÉRDIDA DE BENEFICIOS O LOS FALLOS DE INTEROPERABILIDAD), AUN CUANDO
+SE HAYA ADVERTIDO DE LA POSIBILIDAD DE TALES DAÑOS.
+
+5.3 Recomendación práctica: trabaja siempre sobre copias de tus archivos
+importantes. El software crea archivos nuevos y no sobrescribe los originales,
+pero ninguna herramienta está libre de fallos.
+
+
+6. USO LEGAL Y CONTENIDO DE TERCEROS
+
+6.1 El Usuario es el único responsable del uso que haga del software y del
+contenido que procese o descargue con él.
+
+6.2 Las funciones de descarga (YouTube, Spotify y otras plataformas) deben
+usarse respetando la legislación aplicable, los derechos de autor y los
+términos de servicio de cada plataforma. El autor no promueve ni avala la
+descarga de contenido protegido sin autorización.
+
+6.3 El Usuario se compromete a cumplir la normativa de exportación y de
+protección de datos que le resulte aplicable.
+
+
+7. VIGENCIA
+
+7.1 Los derechos concedidos por la AGPL-3.0 son perpetuos mientras se cumplan
+sus condiciones. Si incumples la licencia, tus derechos terminan
+automáticamente, con las posibilidades de subsanación previstas en la sección 8
+de la AGPL.
+
+7.2 Las secciones sobre ausencia de garantía y limitación de responsabilidad
+siguen vigentes tras la terminación.
+
+
+8. LEY APLICABLE
+
+8.1 Estos términos se interpretarán conforme a la legislación de los Estados
+Unidos Mexicanos, sin que ello pueda restringir los derechos que la AGPL-3.0
+concede al Usuario ni las garantías legales imperativas de su país de
+residencia.
+
+
+9. CONTACTO
+
+Autor: Kevin González (DoMiNaTh0R)
+Correo: DoMiNaTh0RRoyale@gmail.com
+Código fuente: https://github.com/DoMiNaTh0R/DEUS-MACHINA-TOOLS
+
+
+================================================================================
+
+
+ENGLISH VERSION:
+
+LICENSE AND USAGE TERMS
+
+SOFTWARE: DEUS MACHINA | TOOLS (and all its future versions and updates)
+VERSION: 3.0
+AUTHOR: Kevin González (DoMiNaTh0R)
+LICENSE: GNU Affero General Public License, version 3 (AGPL-3.0) or later
+SOURCE CODE: https://github.com/DoMiNaTh0R/DEUS-MACHINA-TOOLS
+EFFECTIVE DATE: September 19, 2026
+
+This document summarizes, in plain language, your rights and obligations when
+using this software. The governing legal text is the GNU Affero General Public
+License v3, included in full in the LICENSE file (LICENSE.txt), together with
+the section 7 additional permission in LICENSE-EXCEPTION.txt. In case of any
+discrepancy between this summary and the AGPL-3.0, the AGPL-3.0 prevails.
+
+By installing, copying, downloading or using the software you accept the terms
+of the AGPL-3.0.
+
+
+1. PROGRAM LICENSE
+
+1.1 DEUS MACHINA | TOOLS is FREE SOFTWARE. It is distributed under the GNU
+Affero General Public License version 3 or, at your option, any later version.
+
+1.2 You have the right to:
+(a) use the program for any purpose, including commercial use, free of charge;
+(b) study how it works and access its complete source code;
+(c) modify it and adapt it to your needs;
+(d) redistribute copies, as-is or modified.
+
+1.3 In exchange, if you distribute the program (modified or not) you must:
+(a) keep the copyright, license and warranty notices;
+(b) provide or make available to the recipient the complete CORRESPONDING
+    SOURCE CODE, including your modifications, under this same AGPL-3.0
+    license;
+(c) prominently state that you modified the program and the date of the change;
+(d) not impose further restrictions on the rights the AGPL grants to
+    recipients WITH RESPECT TO THE CODE COVERED BY THIS LICENSE. The bundled
+    third-party components (NVIDIA, FFmpeg, Ghostscript, etc.) keep their own
+    licenses, which continue to apply on their own terms.
+
+1.4 NETWORK USE (AGPL section 13). If you modify this program and offer its
+functionality to others over a network (for example, as a web or remote
+service), you must prominently offer those users the complete source code of
+your modified version.
+
+1.5 WHY AGPL. This program links directly, inside its own process, the PyMuPDF
+(MuPDF) library, published under AGPL-3.0. For legal consistency and by the
+author's decision, all original DEUS MACHINA | TOOLS code is also published
+under AGPL-3.0.
+
+1.6 The corresponding source code for every distributed version is publicly
+available at https://github.com/DoMiNaTh0R/DEUS-MACHINA-TOOLS and is also sent
+by email to anyone who requests it at DoMiNaTh0RRoyale@gmail.com.
+
+
+2. INTELLECTUAL PROPERTY, NAME AND TRADEMARKS
+
+2.1 Copyright in the original code belongs to Kevin González (DoMiNaTh0R). The
+AGPL grants rights of use, modification and redistribution, but does not
+transfer ownership of the copyright.
+
+2.2 The name "DEUS MACHINA | TOOLS", its logo, icon and the application's own
+artwork identify the original project. Pursuant to AGPL section 7(e), you may
+not use that name or those distinctive signs to promote or imply the author's
+endorsement of modified versions: if you publish a modified version, use your
+own name. This condition does not restrict any AGPL right over the code.
+
+
+3. THIRD-PARTY COMPONENTS
+
+3.1 External programs (mere aggregation)
+The following components are distributed alongside the software as INDEPENDENT
+PROGRAMS and are invoked as external processes. They do not form a derivative
+work of the main program and each is governed by its own license:
+
+A. FFmpeg — GNU General Public License (GPL) v3
+   Video and audio conversion and processing. Runs as an external process
+   (CLI); it is neither statically nor dynamically linked to the main program.
+   Source code: https://ffmpeg.org/download.html
+
+B. Ghostscript — GNU Affero General Public License (AGPL) v3
+   PDF compression and processing. Invoked exclusively through calls to the
+   gswin64c.exe executable.
+   Source code: https://ghostscript.com/
+
+3.2 Linked components
+
+C. PyMuPDF (fitz) — GNU Affero General Public License (AGPL) v3
+   Linked DIRECTLY as a Python library inside the program's main process (PDF
+   reading, rendering and manipulation in the PDF and OCR modules). This is not
+   mere aggregation: that is why the whole program is distributed under
+   AGPL-3.0 (see 1.5).
+   Documentation and license: https://pymupdf.readthedocs.io/
+
+3.3 NVIDIA libraries (CUDA / cuDNN)
+
+This package includes redistributable dynamic-link libraries owned by NVIDIA
+Corporation, used solely to hardware-accelerate transcription (CTranslate2 /
+faster-whisper) and OCR (PaddlePaddle).
+
+EXACT versions and files distributed with this release of the program:
+
+  CUDA 12.9.79        cublas64_12.dll
+                      cublasLt64_12.dll
+                      cudart64_12.dll
+
+  cuDNN 9.10.2.21     cudnn64_9.dll
+                      cudnn_adv64_9.dll
+                      cudnn_cnn64_9.dll
+                      cudnn_engines_precompiled64_9.dll
+                      cudnn_engines_runtime_compiled64_9.dll
+                      cudnn_graph64_9.dll
+                      cudnn_heuristic64_9.dll
+                      cudnn_ops64_9.dll
+
+"These libraries are distributed solely as redistributable components
+authorized by the NVIDIA license terms applicable to the corresponding
+CUDA/cuDNN version. Such components remain subject to their respective NVIDIA
+licenses and are not part of the AGPLv3 license applicable to the original
+DEUS MACHINA | TOOLS code."
+
+ADDITIONAL PERMISSION UNDER SECTION 7 OF THE AGPL v3: the copyright holder
+grants permission to link or combine this program — and derivative works
+distributed under the AGPLv3 — with those NVIDIA libraries, and to distribute
+the resulting combination. This permission does NOT relicense those libraries:
+NVIDIA Corporation fully retains control and ownership of the CUDA and cuDNN
+licensing. The full text of the permission is in the LICENSE-EXCEPTION.txt file
+shipped with the program.
+
+Applicable NVIDIA terms:
+https://docs.nvidia.com/cuda/eula/index.html
+https://docs.nvidia.com/deeplearning/cudnn/sla/index.html
+
+The User acquires no ownership rights over these components and must comply
+with NVIDIA's conditions when redistributing them.
+
+3.4 AI engines and external tools
+
+Depending on the module you use, the software relies on:
+- PaddleOCR, PaddlePaddle and PaddleX (Apache 2.0), and RapidOCR with ONNX
+  Runtime (Apache 2.0 / MIT) for text recognition. The PaddleOCR engine runs in
+  a SEPARATE PROCESS.
+- faster-whisper and CTranslate2 (MIT), with OpenAI's Whisper models (MIT), for
+  transcription.
+- rembg and the u2net model (MIT) for background removal.
+- yt-dlp (Unlicense), spotDL (MIT) and Deno (MIT) for media downloading; they
+  run as external processes.
+
+Some of these components (Whisper models, the u2net model, Deno and spotDL) are
+NOT included in the installer: the software downloads them automatically from
+their official repositories the first time they are needed, and they are stored
+on the User's machine.
+
+3.5 Python libraries and other components
+Copyright notices and full license texts for every third-party component are in
+the THIRD_PARTY_NOTICES.txt file included with the software.
+
+
+4. PRIVACY AND DATA USE
+
+4.1 The software runs primarily locally on the User's machine. It does not
+"phone home", sends no telemetry, and the author does not collect, process or
+store personal or usage data.
+
+4.2 There are functional exceptions where a connection is made:
+(a) Component downloads: if you use a feature whose component is not present
+    locally (Whisper models, the u2net model, Deno or spotDL), the software
+    connects to official public repositories (Hugging Face, GitHub or PyPI)
+    solely to download it to your machine. yt-dlp updates are downloaded from
+    PyPI and verified against their SHA-256 signature before installation.
+(b) Explicit network features: downloading media requires an active connection
+    while in use.
+
+4.3 In every case the connection is technical and one-directional (resource
+download) and involves no transmission of the User's private data to the
+author.
+
+
+5. NO WARRANTY (AGPL sections 15 and 16)
+
+5.1 THE PROGRAM IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING —WITHOUT LIMITATION— THE WARRANTIES OF MERCHANTABILITY AND
+FITNESS FOR A PARTICULAR PURPOSE. THE ENTIRE RISK AS TO THE QUALITY AND
+PERFORMANCE OF THE PROGRAM IS WITH THE USER.
+
+5.2 IN NO EVENT, UNLESS REQUIRED BY APPLICABLE LAW, WILL THE AUTHOR OR ANY
+PARTY WHO MODIFIES OR REDISTRIBUTES THE PROGRAM BE LIABLE FOR DAMAGES,
+INCLUDING ANY GENERAL, SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES ARISING OUT
+OF THE USE OR INABILITY TO USE THE PROGRAM (INCLUDING LOSS OF DATA, LOSS OF
+PROFITS OR FAILURE TO OPERATE WITH OTHER PROGRAMS), EVEN IF ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGES.
+
+5.3 Practical advice: always work on copies of your important files. The
+software writes new files and does not overwrite originals, but no tool is free
+of faults.
+
+
+6. LEGAL USE AND THIRD-PARTY CONTENT
+
+6.1 The User is solely responsible for how the software is used and for the
+content processed or downloaded with it.
+
+6.2 Download features (YouTube, Spotify and other platforms) must be used in
+compliance with applicable law, copyright and each platform's terms of service.
+The author neither promotes nor endorses downloading protected content without
+authorization.
+
+6.3 The User agrees to comply with any applicable export control and data
+protection regulations.
+
+
+7. TERM
+
+7.1 The rights granted by the AGPL-3.0 are perpetual as long as its conditions
+are met. If you violate the license, your rights terminate automatically,
+subject to the reinstatement provisions in section 8 of the AGPL.
+
+7.2 The no-warranty and limitation-of-liability sections survive termination.
+
+
+8. GOVERNING LAW
+
+8.1 These terms shall be interpreted under the laws of the United Mexican
+States, without restricting the rights granted to the User by the AGPL-3.0 or
+any mandatory legal guarantees in the User's country of residence.
+
+
+9. CONTACT
+
+Author: Kevin González (DoMiNaTh0R)
+Email: DoMiNaTh0RRoyale@gmail.com
+Source code: https://github.com/DoMiNaTh0R/DEUS-MACHINA-TOOLS

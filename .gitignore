@@ -1,0 +1,32 @@
+# Entorno virtual y compilación
+build_env_DMT/
+build/
+dist/
+*.spec
+__pycache__/
+*.py[cod]
+
+# Herramientas externas (se descargan aparte: ver docs/COMPILAR.md)
+tools/
+
+# Registros y temporales
+*.log
+instalacion_venv_dmt.log
+*.tmp
+.cache/
+
+# Archivos propios del autor que NO se publican
+version_info.txt          # metadatos de versión del .exe (opcional al compilar)
+diagnostico_cuda.py
+generar_licencias.py
+licencias_extra.json
+build_nuitka.py
+
+# Cosas locales
+*.whl
+*.pfx
+*.bak
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
