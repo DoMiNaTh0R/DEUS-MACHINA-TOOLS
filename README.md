@@ -15,10 +15,14 @@
 ## Descarga / Download
 
 **Código fuente / Source code:** este repositorio
-**Instalador / Installer:** **[Descargar DEUS MACHINA | TOOLS v3.0](https://drive.google.com/drive/u/2/folders/1Ndj1H-xpfA5u2HEyzgYfJhcuceup3xqK)**
 
-> El instalador se aloja fuera del repositorio por su tamaño.
-> The installer is hosted externally due to its file size.
+**Instalador / Installer (~1.7 GB):**
+
+- **[GitHub Releases](https://github.com/DoMiNaTh0R/DEUS-MACHINA-TOOLS/releases/latest)**
+- **[Google Drive](https://drive.google.com/drive/folders/1Vr5GbW31KSOUGScupc5S8DhU_w5zGrFb)** (espejo / mirror)
+
+> Es el mismo instalador en los dos sitios.
+> It is the same installer in both places.
 
 ---
 
@@ -26,17 +30,17 @@
 
 | Módulo | Para qué sirve |
 |---|---|
-| **Video** | Convertir y comprimir con detección real de NVENC/NVDEC (H.264, H.265, AV1, 10 bits), niveles de calidad por códec y extracción de audio |
+| **Video** | Convertir y comprimir con detección real de NVENC/NVDEC (H.264, H.265, AV1, 10 bits), niveles de calidad por códec, extracción de audio, varias pistas de audio y subtítulos (eliges cuáles conservar) |
 | **Audio** | Conversión entre MP3, M4A, OPUS, WAV, FLAC… con perfiles de calidad |
 | **Imágenes** | Convertir, comprimir y quitar fondo (rembg/u2net). SVG, HEIC, PSD e ICO multiescala |
 | **PDF** | Comprimir (Ghostscript), unir, dividir, PDF ⇄ imágenes con control de DPI |
 | **OCR** | Extraer texto con PaddleOCR (GPU/CPU) o RapidOCR; decide página por página si el texto se extrae directo o se lee con IA |
-| **Transcripción** | faster-whisper: archivos, YouTube → texto y en vivo, con selector de idioma y modo multilingüe |
-| **Descargas** | YouTube y Spotify (yt-dlp / spotDL), cola de 3 a la vez, metadatos y carátulas |
+| **Transcripción** | faster-whisper: archivos, YouTube / Spotify → texto y en vivo, con selector de idioma y modo multilingüe; subtítulos de videos y letras de canciones (solas o con tiempos) sin IA |
+| **Descargas** | YouTube y Spotify (yt-dlp / spotDL), cola de 3 a la vez para YouTube (Spotify va aparte), metadatos, carátulas, códec preferido, pista de audio (doblajes), subtítulos dentro del video y letras de YouTube Music |
 | **Renombrador** | Renombrado masivo con vista previa y deshacer del último lote |
 | **Metadata Lab** | Leer, editar, limpiar y verificar metadatos de imágenes, audio, video, PDF y Office |
 
-Varios módulos pueden trabajar **a la vez**; los que cargan modelos de IA se turnan solos para no saturar la memoria.
+Varios módulos pueden trabajar **a la vez**; los que cargan modelos de IA se turnan solos para no saturar la memoria, y un botón (en el menú, Transcripción, OCR y Quitar fondo) libera el modelo cargado cuando termina lo que está en curso.
 
 Detalle completo de cambios: **[CHANGELOG](imgtype/CHANGELOG.md)** · Documentación de usuario: **[README de la app](imgtype/README.md)**
 
@@ -121,7 +125,7 @@ El archivo [LICENSE-EXCEPTION.txt](LICENSE-EXCEPTION.txt) recoge el **permiso ad
 **DEUS MACHINA | TOOLS v3.0** is a Windows desktop app for local media processing: video and audio conversion, image tools (including background removal), PDF utilities, OCR (PaddleOCR / RapidOCR), AI transcription (faster-whisper), YouTube/Spotify downloading, batch renaming and a metadata lab. Everything runs locally; no telemetry.
 
 - **Source code:** this repository
-- **Installer:** [Download DEUS MACHINA | TOOLS v3.0](https://drive.google.com/drive/u/2/folders/1Ndj1H-xpfA5u2HEyzgYfJhcuceup3xqK) *(hosted externally due to its file size)*
+- **Installer (~1.7 GB):** [GitHub Releases](https://github.com/DoMiNaTh0R/DEUS-MACHINA-TOOLS/releases/latest) or [Google Drive](https://drive.google.com/drive/folders/1Vr5GbW31KSOUGScupc5S8DhU_w5zGrFb) *(mirror, same file)*
 - **Build from source:** see [docs/COMPILAR.md](docs/COMPILAR.md)
 - **License:** GNU AGPL-3.0 or later — the app links PyMuPDF (AGPL-3.0) in-process, so the whole work is AGPL. An [additional permission under section 7](LICENSE-EXCEPTION.txt) covers combining the program with NVIDIA's CUDA/cuDNN runtimes, which remain under NVIDIA's own licenses. Full third-party license texts in [imgtype/THIRD_PARTY_NOTICES.txt](imgtype/THIRD_PARTY_NOTICES.txt).
 

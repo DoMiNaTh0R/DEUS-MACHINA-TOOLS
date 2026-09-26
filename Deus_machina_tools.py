@@ -1150,6 +1150,22 @@ def _ruta_unica(path):
     return f"{base} ({i}){ext}"
 
 
+def _ruta_unica_reservando(path, reservadas, candado):
+    """
+    _ruta_unica para trabajos que corren A LA VEZ: además de lo que ya existe en
+    disco, evita los nombres que otro hilo ya eligió y todavía no terminó de
+    escribir (si no, dos 'foto.webp' se pisarían).
+    """
+    with candado:
+        base, ext = os.path.splitext(path)
+        candidata, i = path, 1
+        while os.path.exists(candidata) or os.path.normcase(candidata) in reservadas:
+            candidata = f"{base} ({i}){ext}"
+            i += 1
+        reservadas.add(os.path.normcase(candidata))
+        return candidata
+
+
 # --- VARIABLES GLOBALES PARA LIBRERÍAS PESADAS (PLACEHOLDERS) ---
 # Se definen vacías para que el programa arranque instantáneo.
 # Se llenarán en background.
@@ -2073,9 +2089,1017 @@ def _yt_opts_diagnostico():
     """
     return {"logger": _YtDlpDiagLogger()}
 
-# Descargas (YouTube / Spotify) que pueden estar BAJANDO a la vez. Las que ya
-# bajaron y solo están convirtiendo o empaquetando no cuentan: al llegar a ese
-# paso sueltan su lugar y arranca la siguiente de la cola.
+def _yt_es_tiktok(url_o_info):
+    """True si la URL (o la info que devolvió yt-dlp) es de TikTok."""
+    try:
+        if isinstance(url_o_info, dict):
+            texto = " ".join(str(url_o_info.get(k) or "") for k in
+                             ("extractor_key", "extractor", "webpage_url", "original_url"))
+        else:
+            texto = str(url_o_info or "")
+        return "tiktok" in texto.lower()
+    except Exception:
+        return False
+
+# Códec preferido del modo Video (YouTube Downloader → ⚙️ Configuración).
+# Solo cambia el orden ENTRE H.264 y H.265: VP9.2, AV1 y VP9 (mejor calidad por
+# el mismo peso) siguen primero, como en yt-dlp. La resolución, los fps y el HDR
+# mandan; el códec solo desempata entre formatos de la misma calidad.
+YT_CODECS = {
+    "h264": "H.264 · compatible",
+    "h265": "H.265 · más liviano",
+}
+_YT_ORDEN_VCODEC = {
+    "h264": [r"vp0?9\.0?2", "av0?1", "vp0?9", "[hx]264|avc", "[hx]265|he?vc?",
+             "vp0?8", "mp4v|h263", "theora", "", None, "none"],
+    "h265": [r"vp0?9\.0?2", "av0?1", "vp0?9", "[hx]265|he?vc?", "[hx]264|avc",
+             "vp0?8", "mp4v|h263", "theora", "", None, "none"],
+}
+_yt_clases_ydl = {}
+_yt_clases_lock = threading.Lock()
+
+def _yt_codec_valido(codec):
+    """'h264' o 'h265' ('auto', de versiones anteriores, pasa a H.264)."""
+    return codec if codec in YT_CODECS else "h264"
+
+def _yt_clase_ydl(codec):
+    """
+    YoutubeDL que ordena los formatos con el orden de códecs elegido. Se arma una
+    sola vez por códec y no hace ninguna consulta extra (no retrasa la descarga).
+    None si esta versión de yt-dlp cambió por dentro: se usa el orden normal.
+    """
+    clave = (codec, id(yt_dlp.YoutubeDL))       # si yt-dlp se actualiza, se arma de nuevo
+    with _yt_clases_lock:
+        if clave in _yt_clases_ydl:
+            return _yt_clases_ydl[clave]
+        clase = None
+        try:
+            import copy
+            from yt_dlp.utils import FormatSorter
+            ajustes = copy.deepcopy(FormatSorter.settings)
+            ajustes["vcodec"] = dict(ajustes["vcodec"], order=list(_YT_ORDEN_VCODEC[codec]))
+            ordenador = type(f"_OrdenCodec_{codec}", (FormatSorter,), {"settings": ajustes})
+
+            class _YoutubeDLCodec(yt_dlp.YoutubeDL):
+                def sort_formats(self, info_dict):
+                    try:
+                        formatos = self._get_formats(info_dict)
+                        formatos.sort(key=ordenador(
+                            self, info_dict.get("_format_sort_fields") or []).calculate_preference)
+                    except Exception as e:
+                        print(f"[YT] Orden de códecs no aplicado ({e}); se usa el de yt-dlp.")
+                        super().sort_formats(info_dict)
+
+            clase = _YoutubeDLCodec
+        except Exception as e:
+            print(f"[YT] No se pudo preparar el orden de códecs ({e}); se usa el de yt-dlp.")
+        _yt_clases_ydl[clave] = clase
+        return clase
+
+def _yt_ydl(opts, codec=None):
+    """yt_dlp.YoutubeDL(opts) con el orden de códecs de ⚙️ Configuración."""
+    clase = _yt_clase_ydl(_yt_codec_valido(codec)) if codec else None
+    return (clase or yt_dlp.YoutubeDL)(opts)
+
+# Idiomas: ISO 639-1 -> (ISO 639-2, nombre). MP4/MKV guardan el de 3 letras.
+_IDIOMAS = {
+    "es": ("spa", "Español"), "en": ("eng", "Inglés"), "pt": ("por", "Portugués"),
+    "fr": ("fra", "Francés"), "de": ("deu", "Alemán"), "it": ("ita", "Italiano"),
+    "ja": ("jpn", "Japonés"), "ko": ("kor", "Coreano"), "zh": ("zho", "Chino"),
+    "ru": ("rus", "Ruso"), "ar": ("ara", "Árabe"), "hi": ("hin", "Hindi"),
+    "id": ("ind", "Indonesio"), "tr": ("tur", "Turco"), "pl": ("pol", "Polaco"),
+    "nl": ("nld", "Neerlandés"), "uk": ("ukr", "Ucraniano"), "vi": ("vie", "Vietnamita"),
+    "th": ("tha", "Tailandés"), "bn": ("ben", "Bengalí"), "ta": ("tam", "Tamil"),
+    "te": ("tel", "Telugu"), "ml": ("mal", "Malayalam"), "mr": ("mar", "Maratí"),
+    "pa": ("pan", "Panyabí"), "sv": ("swe", "Sueco"), "no": ("nor", "Noruego"),
+    "da": ("dan", "Danés"), "fi": ("fin", "Finés"), "el": ("ell", "Griego"),
+    "he": ("heb", "Hebreo"), "cs": ("ces", "Checo"), "ro": ("ron", "Rumano"),
+    "hu": ("hun", "Húngaro"), "ms": ("msa", "Malayo"), "ca": ("cat", "Catalán"),
+    "gl": ("glg", "Gallego"), "eu": ("eus", "Euskera"), "fa": ("fas", "Persa"),
+    "ur": ("urd", "Urdu"), "fil": ("fil", "Filipino"), "la": ("lat", "Latín"),
+}
+_IDIOMAS_ISO3 = {v[0]: k for k, v in _IDIOMAS.items()}
+_IDIOMAS_ISO3.update({"ger": "de", "fre": "fr", "chi": "zh", "dut": "nl", "gre": "el",
+                      "cze": "cs", "rum": "ro", "per": "fa", "may": "ms", "baq": "eu",
+                      "tgl": "fil"})
+_IDIOMAS_REGION = {"419": "Latinoamérica", "us": "EE. UU.", "mx": "México", "es": "España",
+                   "br": "Brasil", "pt": "Portugal", "gb": "Reino Unido", "ca": "Canadá",
+                   "fr": "Francia", "hans": "simplificado", "hant": "tradicional"}
+
+def _idioma_iso3(codigo):
+    """'es-419' -> 'spa'; 'eng' -> 'eng'; desconocido -> None."""
+    base = str(codigo or "").lower().replace("_", "-").split("-")[0]
+    if len(base) == 3 and base.isalpha():
+        return base if base != "und" else None
+    return _IDIOMAS.get(base, (None,))[0]
+
+def _idioma_nombre(codigo):
+    """'es-419' -> 'Español (Latinoamérica)'; 'eng' -> 'Inglés'; 'und'/vacío -> 'sin idioma'."""
+    c = str(codigo or "").strip().lower().replace("_", "-")
+    if not c or c == "und":
+        return "sin idioma"
+    base, _, region = c.partition("-")
+    base = _IDIOMAS_ISO3.get(base, base)
+    nombre = _IDIOMAS.get(base, (None, None))[1]
+    if not nombre:
+        return str(codigo)
+    extra = _IDIOMAS_REGION.get(region)
+    return f"{nombre} ({extra})" if extra else nombre
+
+# Pista de audio (⚙️ Configuración): muchos videos de YouTube traen el audio
+# doblado a otros idiomas (formatos HLS 233/234 con idioma) además del original.
+YT_PISTAS_AUDIO = {"original": "Original", "en": "Inglés", "es": "Español",
+                   "ambas": "Ambas", "preguntar": "Preguntarme"}
+# Variante preferida de cada idioma si hay varias (y ninguna es la original)
+_YT_VARIANTES = {"es": ("es-419", "es-us", "es-mx", "es", "es-es"),
+                 "en": ("en-us", "en", "en-gb")}
+
+def _yt_es_pista_audio(f):
+    """Formato de solo audio (los doblajes HLS no traen el códec: acodec vacío)."""
+    return isinstance(f, dict) and f.get("vcodec") == "none" and f.get("acodec") != "none"
+
+def _yt_idiomas_audio(info):
+    """
+    Idiomas de las pistas de audio de un video: [(idioma, es_original)], la
+    original primero. Vacío si el sitio no marca idiomas. La audiodescripción no
+    cuenta como idioma.
+    """
+    idiomas, original = [], None
+    for f in (info or {}).get("formats") or []:
+        if not _yt_es_pista_audio(f):
+            continue
+        lang = str(f.get("language") or "")
+        if not re.fullmatch(r"[A-Za-z0-9_.-]+", lang) or lang.lower().endswith("-desc"):
+            continue
+        if lang not in idiomas:
+            idiomas.append(lang)
+        if original is None and (f.get("language_preference") or 0) >= 10:
+            original = lang
+    if original:
+        idiomas.remove(original)
+        idiomas.insert(0, original)
+    return [(l, l == original) for l in idiomas]
+
+def _yt_plan_pistas(info, eleccion, modo_audio=False):
+    """
+    Idiomas de audio a bajar según ⚙️ Configuración, en el orden en que quedan
+    en el archivo (la original primero). None = como siempre: la original.
+      · Inglés / Español: esa pista; si el video no la tiene, la original.
+      · Ambas: español e inglés; si falta uno, en su lugar va la original.
+      · Lista (elegidas con "Preguntarme"): esas.
+    En modo Audio se guarda UNA pista: la del idioma elegido o la original.
+    """
+    idiomas = _yt_idiomas_audio(info)
+    if len(idiomas) < 2:
+        return None                         # una sola pista: nada que elegir
+    original = next((l for l, o in idiomas if o), None)
+    if isinstance(eleccion, (list, tuple)):
+        plan = [l for l in eleccion if l in [x for x, _ in idiomas]]
+        if modo_audio:
+            plan = plan[:1]
+        plan.sort(key=lambda l: l != original)
+        return plan if plan and plan != [original] else None
+    if eleccion not in ("en", "es", "ambas"):
+        return None
+
+    def _de(base):
+        candidatos = [l for l, _ in idiomas if l.lower().split("-")[0] == base]
+        if not candidatos:
+            return None
+        if original in candidatos:
+            return original
+        pref = _YT_VARIANTES.get(base, ())
+        return min(candidatos, key=lambda l: pref.index(l.lower()) if l.lower() in pref else len(pref))
+
+    if eleccion in ("en", "es"):
+        plan = [_de(eleccion)]
+    elif modo_audio:
+        return None
+    else:
+        plan = [_de("es") or original, _de("en") or original]
+    plan = [l for i, l in enumerate(plan) if l and l not in plan[:i]]
+    plan.sort(key=lambda l: l != original)          # la original primero (orden estable)
+    if not plan or plan == [original]:
+        return None
+    return plan
+
+def _yt_es_hls(f):
+    return str((f or {}).get("protocol") or "").startswith("m3u8")
+
+def _yt_duracion_formato(f):
+    """
+    Duración que declara el enlace de un formato de YouTube, o None. En los DASH
+    es el parámetro dur=. En los HLS solo se cree la del VIDEO (tramo sgovp,
+    "clen=…;dur=…;"): la del audio HLS (sgoap) no es la de su lista de fragmentos
+    (con la edición anterior dice 964 s y los fragmentos suman 947).
+    """
+    url = str((f or {}).get("url") or "")
+    if "%3" in url:
+        from urllib.parse import unquote
+        url = unquote(url)
+    if "/hls_playlist/" in url or "/sgoap/" in url or "/sgovp/" in url:
+        m = re.search(r"/sgovp/(?:[^/;]*;)*dur=(\d+(?:\.\d+)?)", url)
+    else:
+        m = re.search(r"[?&/]dur[=/](\d+(?:\.\d+)?)", url)
+    return float(m.group(1)) if m else None
+
+def _yt_duraciones_formatos(info):
+    """
+    (duración del video, tolerancia, [(formato, duración)]) o None si no hay datos.
+    Cada lista HLS es toda de UNA edición: su audio (doblajes incluidos) va con la
+    duración de los videos de esa misma lista, que sí la dicen bien.
+    """
+    try:
+        duracion = float((info or {}).get("duration") or 0)
+    except (TypeError, ValueError):
+        return None
+    if duracion <= 0:
+        return None
+    formatos = [f for f in (info or {}).get("formats") or [] if isinstance(f, dict)]
+    lista_hls = {}
+    for f in formatos:
+        if _yt_es_hls(f) and f.get("vcodec") not in (None, "none"):
+            d = _yt_duracion_formato(f)
+            if d is not None:
+                lista_hls.setdefault(f.get("manifest_url") or "", d)
+    con_dur = []
+    for f in formatos:
+        d = _yt_duracion_formato(f)
+        if d is None and _yt_es_hls(f) and _yt_es_pista_audio(f):
+            d = lista_hls.get(f.get("manifest_url") or "")
+        if d is not None:
+            con_dur.append((f, d))
+    if not con_dur:
+        return None
+    return duracion, max(3.0, duracion * 0.01), con_dur
+
+def _yt_duraciones_clave(con_dur):
+    """Las duraciones que dicen de qué edición es cada parte: las de video (si no hay, las de audio)."""
+    videos = [d for f, d in con_dur if f.get("vcodec") not in (None, "none")]
+    return videos or [d for f, d in con_dur if _yt_es_pista_audio(f)]
+
+def _yt_otra_edicion(info):
+    """
+    True si YouTube entregó el video, todo o en parte, de OTRA edición: algún
+    formato de video no dura lo que el video en la página. Pasa en unas sesiones
+    y en otras no (ver _yt_extraer_crudo): a veces todo es de la anterior y a
+    veces solo los DASH o solo los HLS (con sus doblajes).
+    """
+    datos = _yt_duraciones_formatos(info)
+    if not datos:
+        return False
+    duracion, tolerancia, con_dur = datos
+    return any(abs(d - duracion) > tolerancia for d in _yt_duraciones_clave(con_dur))
+
+def _yt_quitar_otra_edicion(info, solo_audio=False):
+    """
+    Algunos videos editados después de subirse tienen DOS ediciones (p. ej. una
+    anterior, con segundos de menos). Si en una misma respuesta llegan formatos de
+    las dos, unidos no coinciden (ni con los subtítulos). Cada formato dice de qué
+    edición es (_yt_duraciones_formatos), así que se deja UNA:
+      · la que se ve en YouTube (dura lo que dice la página y con ella van los
+        subtítulos), si llegaron formatos de video de ella;
+      · si no, la de los formatos de video que sí llegaron (todo de la misma
+        edición antes que mezclado).
+    Solo se quita algo si quedan video y audio para elegir (solo audio: audio).
+    Si con eso se van idiomas de audio (doblajes), queda anotado en
+    info["_dmt_doblajes_fuera"]. Devuelve cuántos formatos se quitaron.
+    """
+    datos = _yt_duraciones_formatos(info)
+    if not datos:
+        return 0
+    duracion, tolerancia, con_dur = datos
+    clave = _yt_duraciones_clave(con_dur)
+    if not clave:
+        return 0
+    if any(abs(d - duracion) <= tolerancia for d in clave):
+        buena = duracion
+    else:
+        from collections import Counter
+        buena = float(Counter(round(d) for d in clave).most_common(1)[0][0])
+    malos = {id(f) for f, d in con_dur if abs(d - buena) > tolerancia}
+    if not malos:
+        return 0
+    formatos = [f for f in info.get("formats") or [] if isinstance(f, dict)]
+    buenos = [f for f in formatos if id(f) not in malos]
+    hay_video = any(f.get("vcodec") not in (None, "none") for f in buenos)
+    hay_audio = any(_yt_es_pista_audio(f) or (f.get("vcodec") not in (None, "none")
+                                               and f.get("acodec") not in (None, "none")) for f in buenos)
+    if not hay_audio or not (hay_video or solo_audio):
+        return 0                            # mejor la mezcla que nada
+    otra = sorted({round(d) for f, d in con_dur if id(f) in malos})
+    print(f"[YT] {len(malos)} formato(s) son de otra edición del video ({otra} s en vez de "
+          f"{buena:.0f} s): se descartan.")
+    antes = {l for l, _ in _yt_idiomas_audio(info)}
+    info["formats"] = buenos
+    fuera = antes - {l for l, _ in _yt_idiomas_audio(info)}
+    if fuera:
+        info["_dmt_doblajes_fuera"] = sorted(fuera)
+    return len(malos)
+
+# En videos con dos ediciones, cuántas veces se pide de nuevo si YouTube entrega la vieja
+_YT_INTENTOS_EDICION = 8
+
+def _yt_sesion_nueva(ydl):
+    """
+    Olvida la sesión de YouTube de 'ydl' (sus cookies de visitante): con la misma
+    sesión YouTube responde siempre lo mismo. Nunca con cookies del usuario
+    (archivo o navegador): esas no se tocan.
+    """
+    try:
+        if ydl.params.get("cookiefile") or ydl.params.get("cookiesfrombrowser"):
+            return False
+        jar = ydl.cookiejar
+        for c in list(jar):
+            if c.name not in ("SOCS", "CONSENT"):   # las del aviso de cookies se quedan
+                jar.clear(c.domain, c.path, c.name)
+        return True
+    except Exception:
+        return False
+
+def _yt_extraer_crudo(ydl, url, solo_audio=False, aviso=None, debe_parar=None):
+    """
+    extract_info(url, process=False) sin los formatos de otra edición del video.
+    En videos editados después de subirse, en muchas sesiones YouTube entrega de
+    la edición ANTERIOR todo (video, audio y doblajes) o una parte (solo los DASH
+    o solo los HLS), aunque la página y los subtítulos sean de la actual. Si pasa,
+    se pide de nuevo con una sesión nueva (~1 s cada vez), hasta
+    _YT_INTENTOS_EDICION veces; si nunca llega completa, se deja una sola edición
+    (_yt_quitar_otra_edicion) y la descarga lo avisa.
+    aviso(n): opcional, se llama antes del intento n (2, 3, …).
+    """
+    crudo = None
+    for n in range(1, _YT_INTENTOS_EDICION + 1):
+        crudo = ydl.extract_info(url, download=False, process=False)
+        if not (isinstance(crudo, dict) and crudo.get("_type", "video") == "video"):
+            return crudo
+        if not _yt_otra_edicion(crudo):
+            break
+        if n == _YT_INTENTOS_EDICION or (debe_parar and debe_parar()) or not _yt_sesion_nueva(ydl):
+            print(f"[YT] YouTube no entregó el video completo de la edición actual ({n} intento(s)): "
+                  f"se baja una sola edición (si no es la actual, los subtítulos pueden no coincidir).")
+            break
+        print(f"[YT] YouTube entregó el video de otra edición (intento {n} de "
+              f"{_YT_INTENTOS_EDICION}): se pide de nuevo.")
+        if aviso:
+            try:
+                aviso(n + 1)
+            except Exception:
+                pass
+    _yt_quitar_otra_edicion(crudo, solo_audio)
+    return crudo
+
+def _yt_extraer_bajar(ydl, url, solo_audio=False):
+    """extract_info(url, download=True), pero sin los formatos de otra edición del video."""
+    return ydl.process_ie_result(_yt_extraer_crudo(ydl, url, solo_audio), download=True)
+
+def _yt_equivalentes(elegidos, disponibles):
+    """
+    En una playlist, lo elegido para el primer video aplicado a otro: el mismo
+    código de idioma o, si no está, otra variante del mismo idioma (es-419 / es).
+    """
+    salida = []
+    for codigo in elegidos or []:
+        if codigo in disponibles:
+            igual = codigo
+        else:
+            base = str(codigo).lower().split("-")[0]
+            igual = next((d for d in disponibles if str(d).lower().split("-")[0] == base), None)
+        if igual and igual not in salida:
+            salida.append(igual)
+    return salida
+
+def _yt_pistas_bajadas(info):
+    """[(idioma, es_original)] de cada pista de audio que se bajó, en el orden del archivo."""
+    if not isinstance(info, dict):
+        return []
+    formatos = info.get("requested_formats") or [info]
+    return [(f.get("language"), (f.get("language_preference") or 0) >= 10)
+            for f in formatos if isinstance(f, dict) and f.get("acodec") != "none"
+            and (f.get("vcodec") == "none" or len(formatos) == 1)]
+
+def _yt_capturar_info(ydl):
+    """
+    Agrega a 'ydl' un último paso que anota lo que se bajó de verdad (qué
+    formatos y de qué idioma). Devuelve el dict donde queda (clave 'info').
+    """
+    caja = {}
+    try:
+        from yt_dlp.postprocessor.common import PostProcessor
+
+        class _CapturaInfo(PostProcessor):
+            def run(self, info):
+                caja["info"] = info
+                return [], info
+
+        ydl.add_post_processor(_CapturaInfo(), when="post_process")
+    except Exception as e:
+        print(f"[YT] No se pudo anotar la info de la descarga (no crítico): {e}")
+    return caja
+
+def _yt_formato_video(limit_height, info=None, pistas=None):
+    """
+    Selector de formato del modo Video (alto máximo 'limit_height').
+      · Normal (YouTube y casi todo): mejor video + mejor audio, que se unen.
+      · Si el sitio ya da el video CON su audio a la misma calidad que el mejor
+        "solo video", se baja ese directo (no hay nada que unir).
+      · TikTok siempre así: su único "solo audio" es la pista de MÚSICA del
+        video (no su audio real) y sus H.265 "solo video" a veces ni descargan
+        (formatos 'Untested'). Por eso algunos TikTok fallaban en el descargador
+        y en Transcripción (que baja solo audio) no.
+    El códec lo decide el orden de _yt_ydl (⚙️ Configuración) sin bajar nunca la
+    resolución. pistas: idiomas de audio a juntar en el archivo (_yt_plan_pistas);
+    None = la pista de siempre (la original).
+    El '?' deja pasar formatos sin alto conocido y el último tramo sin filtro
+    evita el "Requested format is not available" si nada entra en el límite.
+    """
+    h = int(limit_height or 0) or 2160
+    normal = f"bv[height<=?{h}]+ba/b[height<=?{h}]/bv*+ba/b"
+    directo = f"b[height<=?{h}]/bv[height<=?{h}]+ba/b/bv*+ba"
+    es_tiktok = _yt_es_tiktok(info)
+    try:
+        formatos = [f for f in ((info or {}).get("formats") or []) if isinstance(f, dict)]
+
+        def _cabe(f):
+            alto = f.get("height")
+            return not alto or alto <= h
+
+        con_audio = [f for f in formatos if f.get("vcodec") != "none"
+                     and f.get("acodec") != "none" and _cabe(f)]
+        solo_video = [f for f in formatos if f.get("vcodec") != "none"
+                      and f.get("acodec") == "none" and _cabe(f)]
+        mejor_con_audio = max(((f.get("height") or 0) for f in con_audio), default=0)
+        mejor_solo_video = max(((f.get("height") or 0) for f in solo_video), default=0)
+        if es_tiktok or (con_audio and mejor_con_audio >= mejor_solo_video):
+            return directo
+        if pistas:
+            audios = "".join(f"+ba[language={l}]" for l in pistas)
+            return f"bv[height<=?{h}]{audios}/{normal}"
+        return normal
+    except Exception:
+        return directo if es_tiktok else normal
+
+def _yt_es_youtube(info):
+    """True si la info de yt-dlp es de un video de YouTube (no playlist ni canal)."""
+    try:
+        return str((info or {}).get("extractor_key") or "").lower() == "youtube"
+    except Exception:
+        return False
+
+def _yt_formato_audio(url_o_info, pistas=None):
+    """
+    Formato para bajar SOLO el audio (modo Audio del descargador y Transcripción).
+    En TikTok el único "solo audio" es la pista de MÚSICA, no el audio real del
+    video: se baja el video liviano con su audio y de ahí se saca el sonido (si
+    es un TikTok de fotos, sin video, queda la pista de música). En el resto, el
+    mejor audio tal cual.
+    """
+    if _yt_es_tiktok(url_o_info):
+        return "b[height<=?1024]/b/bestaudio/best"
+    if pistas:                              # idioma elegido en ⚙️ (si no está, la original)
+        return f"ba[language={pistas[0]}]/bestaudio/best"
+    return "bestaudio/best"
+
+# Subtítulos dentro del video (YouTube Downloader → ⚙️ Configuración)
+YT_SUBS_IDIOMAS = {"no": "No", "es": "Español", "en": "Inglés", "ambos": "Ambos",
+                   "preguntar": "Preguntarme"}
+_SUBS_EXTS = (".vtt", ".srt", ".ass", ".ssa", ".ttml", ".srv1", ".srv2", ".srv3", ".json3")
+_SUBS_ISO3 = {"es": ("spa", "Español"), "en": ("eng", "Inglés")}
+_SUBS_PREFERIDOS = {"es": ("es", "es-419", "es-mx", "es-us", "es-es"),
+                    "en": ("en", "en-us", "en-gb", "en-ca", "en-au")}
+
+def _subs_idioma_base(clave):
+    """'es-419' / 'spa-ES' -> 'es'; 'en-US' / 'eng' -> 'en'; el resto -> None."""
+    raiz = re.split(r"[-_]", str(clave or "").lower(), maxsplit=1)[0]
+    return {"es": "es", "spa": "es", "en": "en", "eng": "en"}.get(raiz)
+
+def _subs_idiomas_pedidos(idiomas):
+    return {"es": {"es"}, "en": {"en"}, "ambos": {"es", "en"}}.get(idiomas, set())
+
+def _yt_opts_subtitulos(idiomas):
+    """
+    Opciones de yt-dlp para los subtítulos que se incrustan en el video: SOLO los
+    subidos por el autor (writeautomaticsub=False: los automáticos nunca).
+    """
+    if isinstance(idiomas, (list, tuple)):  # elegidos a mano ("Preguntarme")
+        if not idiomas:
+            return {}
+        return {"writesubtitles": True, "writeautomaticsub": False,
+                "subtitleslangs": [re.escape(l) for l in idiomas], "subtitlesformat": "srt/vtt/ass/best"}
+    langs = []
+    if "es" in _subs_idiomas_pedidos(idiomas):
+        langs += [r"es(?:[-_].+)?", r"spa(?:[-_].+)?"]
+    if "en" in _subs_idiomas_pedidos(idiomas):
+        langs += [r"en(?:[-_].+)?", r"eng(?:[-_].+)?"]
+    if not langs:
+        return {}
+    return {"writesubtitles": True, "writeautomaticsub": False, "subtitleslangs": langs,
+            "subtitlesformat": "srt/vtt/ass/best"}
+
+def _yt_subtitulos_descargados(carpeta):
+    """
+    Subtítulos que quedaron junto al video (nombre.<idioma>.srt/vtt/ass), uno por
+    idioma: español e inglés primero y después los demás elegidos con
+    "Preguntarme". [(ruta, código ISO 639-2, título)].
+    """
+    elegidos = {}
+    try:
+        nombres = sorted(os.listdir(carpeta))
+    except OSError:
+        return []
+    for f in nombres:
+        base, ext = os.path.splitext(f)
+        if ext.lower() not in (".srt", ".vtt", ".ass", ".ssa") or "." not in base:
+            continue
+        lang = base.rsplit(".", 1)[-1]
+        clave = _subs_idioma_base(lang) or lang.lower()
+        preferidos = _SUBS_PREFERIDOS.get(clave, ())
+        orden = preferidos.index(lang.lower()) if lang.lower() in preferidos else len(preferidos)
+        if clave not in elegidos or orden < elegidos[clave][0]:
+            elegidos[clave] = (orden, os.path.join(carpeta, f), lang)
+    salida = []
+    for clave in sorted(elegidos, key=lambda c: (0 if c == "es" else 1 if c == "en" else 2, c)):
+        _, ruta, lang = elegidos[clave]
+        if clave in _SUBS_ISO3:
+            salida.append((ruta,) + _SUBS_ISO3[clave])
+        else:
+            salida.append((ruta, _idioma_iso3(lang) or "und", _idioma_nombre(lang)))
+    return salida
+
+# ------------------------------------------------------------------------------
+#  SUBTÍTULOS SUELTOS Y LETRAS (Transcripción → pestaña "Subtítulos y Letras")
+# ------------------------------------------------------------------------------
+_SUBS_TIEMPO = re.compile(r"(?:(\d+):)?(\d{1,2}):(\d{2})(?:[.,](\d{1,3}))?")
+_SUBS_ETIQUETA = re.compile(r"<[^>]+>")
+
+def _subs_segundos(texto):
+    m = _SUBS_TIEMPO.search(texto or "")
+    if not m:
+        return None
+    h, mi, s, ms = m.groups()
+    return int(h or 0) * 3600 + int(mi) * 60 + int(s) + int((ms or "0").ljust(3, "0")) / 1000
+
+def _subs_ts(segundos, sep):
+    ms = int(round(max(segundos, 0) * 1000))
+    h, ms = divmod(ms, 3600000)
+    m, ms = divmod(ms, 60000)
+    s, ms = divmod(ms, 1000)
+    return f"{h:02}:{m:02}:{s:02}{sep}{ms:03}"
+
+def _subs_leer_srv1(datos):
+    """srv1 de YouTube: <text start="1.2" dur="3.4">…</text> (el texto viene escapado dos veces)."""
+    import html
+    import xml.etree.ElementTree as ET
+    cues = []
+    for el in ET.fromstring(datos.encode("utf-8")).iter("text"):
+        try:
+            inicio = float(el.get("start") or 0)
+            dur = float(el.get("dur") or 0)
+        except ValueError:
+            continue
+        texto = html.unescape(el.text or "").strip()
+        if texto:
+            cues.append([inicio, inicio + max(dur, 0.01), texto])
+    return cues
+
+def _subs_leer_bloques(datos):
+    """VTT o SRT: bloques 'inicio --> fin' + texto (sin etiquetas de estilo)."""
+    import html
+    cues = []
+    for bloque in re.split(r"\n\s*\n", datos.replace("\r\n", "\n").replace("\r", "\n")):
+        lineas = bloque.split("\n")
+        idx = next((i for i, l in enumerate(lineas) if "-->" in l), None)
+        if idx is None:
+            continue
+        izq, der = lineas[idx].split("-->", 1)
+        inicio, fin = _subs_segundos(izq), _subs_segundos(der)
+        if inicio is None or fin is None:
+            continue
+        texto = [html.unescape(_SUBS_ETIQUETA.sub("", l)).strip() for l in lineas[idx + 1:]]
+        texto = "\n".join(l for l in texto if l)
+        if texto:
+            cues.append([inicio, fin, texto])
+    return cues
+
+def _subs_leer(ruta):
+    """[[inicio, fin, texto]] desde srv1 (YouTube), VTT o SRT; otros formatos pasan por FFmpeg."""
+    with open(ruta, "r", encoding="utf-8", errors="replace") as fh:
+        datos = fh.read().lstrip("﻿")
+    ext = os.path.splitext(ruta)[1].lower()
+    if ext == ".srv1" or (datos.lstrip().startswith("<?xml") and "<transcript" in datos[:500]):
+        return _subs_leer_srv1(datos)
+    if ext in (".vtt", ".srt") or "-->" in datos[:5000]:
+        return _subs_leer_bloques(datos)
+    convertido = ruta + ".convertido.srt"
+    subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", ruta, convertido],
+                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=120,
+                   startupinfo=_startup_info_modulo(),
+                   creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    with open(convertido, "r", encoding="utf-8", errors="replace") as fh:
+        return _subs_leer_bloques(fh.read().lstrip("﻿"))
+
+def _subs_escribir(cues, formato, ruta, automaticos=False):
+    """
+    Guarda los subtítulos en .srt, .vtt o .txt. Une líneas repetidas seguidas y
+    recorta los que se enciman (los automáticos de YouTube vienen así). En .txt
+    los automáticos (frases sueltas, sin puntuación) se juntan en párrafos.
+    Devuelve cuántas líneas quedaron.
+    """
+    limpias = []
+    for inicio, fin, texto in sorted((c for c in cues if c[2].strip()), key=lambda c: c[0]):
+        if limpias and texto == limpias[-1][2] and inicio <= limpias[-1][1] + 0.5:
+            limpias[-1][1] = max(limpias[-1][1], fin)
+            continue
+        limpias.append([inicio, max(fin, inicio + 0.01), texto])
+    for actual, siguiente in zip(limpias, limpias[1:]):
+        if actual[0] < siguiente[0] < actual[1]:
+            actual[1] = siguiente[0]
+
+    if formato == ".txt":
+        if automaticos:
+            parrafos, actual, fin_previo = [], [], None
+            for inicio, fin, texto in limpias:
+                if actual and (inicio - fin_previo > 1.5 or len(" ".join(actual).split()) > 80):
+                    parrafos.append(" ".join(actual))
+                    actual = []
+                actual.append(texto.replace("\n", " "))
+                fin_previo = fin
+            if actual:
+                parrafos.append(" ".join(actual))
+            contenido = "\n\n".join(parrafos) + "\n"
+        else:
+            contenido = "\n".join(t for _, _, t in limpias) + "\n"
+    elif formato == ".vtt":
+        contenido = "WEBVTT\n\n" + "".join(
+            f"{_subs_ts(a, '.')} --> {_subs_ts(b, '.')}\n{t}\n\n" for a, b, t in limpias)
+    else:
+        contenido = "".join(f"{n}\n{_subs_ts(a, ',')} --> {_subs_ts(b, ',')}\n{t}\n\n"
+                            for n, (a, b, t) in enumerate(limpias, start=1))
+    with open(ruta, "w", encoding="utf-8") as fh:
+        fh.write(contenido)
+    return len(limpias)
+
+def _subs_orden_idioma(clave):
+    base = _subs_idioma_base(clave)
+    return (0 if base == "es" else 1 if base == "en" else 2, str(clave).lower())
+
+def _subs_opciones_de(info):
+    """
+    Subtítulos que ofrece un video: [(etiqueta, idioma, 'subtitles'|'automatic_captions', automáticos)].
+    Primero los subidos por el autor; después el automático en el idioma original.
+    (Las "traducciones automáticas" de YouTube no se ofrecen: suelen dar HTTP 429.)
+    """
+    opciones = []
+    es_tiktok = _yt_es_tiktok(info)
+    subidos = {k: v for k, v in (info.get("subtitles") or {}).items() if v and k != "live_chat"}
+    for lang in sorted(subidos, key=_subs_orden_idioma):
+        nombre = next((f.get("name") for f in subidos[lang] if f.get("name")), None) or lang
+        # TikTok los guarda como "subtítulos", pero todos son automáticos
+        tipo = "automáticos de TikTok" if es_tiktok else "subidos por el autor"
+        opciones.append((f"{nombre} ({lang}) · {tipo}", lang, "subtitles", es_tiktok))
+    for lang, formatos in (info.get("automatic_captions") or {}).items():
+        if lang.endswith("-orig") and formatos:
+            nombre = next((f.get("name") for f in formatos if f.get("name")), None) or lang
+            nombre = nombre.replace(" (Original)", "")
+            opciones.append((f"{nombre} ({lang[:-5]}) · automáticos", lang, "automatic_captions", True))
+    return opciones
+
+# Algunos subtítulos de YouTube pintan a cada persona de un color: <font color="#00BCE7">
+_SUBS_COLOR = re.compile(r"""<font\b[^>]*?\bcolor\s*=\s*["']?\s*#?([0-9a-zA-Z]+)""", re.I)
+# Espacios invisibles (de ancho cero) que YouTube mete en sus subtítulos
+_SUBS_INVISIBLES = re.compile("[​‌‍⁠﻿]")
+
+def _subs_colores(cues, modo, continuo=False):
+    """
+    Qué hacer con los colores por persona (<font color="…">) de los subtítulos:
+      · 'original': tal cual vienen.
+      · 'texto': solo el texto (con sus tiempos).
+      · 'persona': cada color pasa a "Persona 1:", "Persona 2:"… (en el orden en
+        que aparecen) cuando esa persona empieza a hablar. Si todo el archivo
+        tiene un solo color, no hay a quién distinguir y queda solo el texto.
+    continuo=True (.txt): la etiqueta se repite solo cuando cambia quién habla;
+    en .srt/.vtt cada subtítulo se ve solo, así que empieza con la suya.
+    """
+    import html
+    if modo not in ("texto", "persona"):
+        return cues
+    colores = {}
+    if modo == "persona":
+        for _, _, texto in cues:
+            for c in _SUBS_COLOR.findall(texto):
+                colores.setdefault(c.lower(), len(colores) + 1)
+        if len(colores) < 2:
+            colores = {}
+    salida, previa = [], None
+    for inicio, fin, texto in cues:
+        if not continuo:
+            previa = None
+        lineas = []
+        for linea in texto.split("\n"):
+            m = _SUBS_COLOR.search(linea)
+            limpia = _SUBS_INVISIBLES.sub("", html.unescape(_SUBS_ETIQUETA.sub("", linea)))
+            limpia = re.sub(r"\s{2,}", " ", limpia).strip()
+            if not limpia:
+                continue
+            persona = colores.get(m.group(1).lower()) if (colores and m) else None
+            if persona and persona != previa:
+                limpia = f"Persona {persona}: {limpia}"
+            previa = persona or previa
+            lineas.append(limpia)
+        if lineas:
+            salida.append([inicio, fin, "\n".join(lineas)])
+    return salida
+
+# --- Letras de canciones: LRCLIB, YouTube Music y otros proveedores (syncedlyrics) ---
+_LRCLIB_API = "https://lrclib.net/api"
+_DMT_USER_AGENT = "DEUS MACHINA TOOLS/3.0 (https://github.com/DoMiNaTh0R/DEUS-MACHINA-TOOLS)"
+_RUIDO_TITULO = re.compile(
+    r"\s*[\(\[【][^\)\]】]*\b(official|oficial|video|v[ií]deo|audio|lyrics?|letra|visuali[sz]er"
+    r"|remaster(?:ed)?|hd|4k|live|en vivo|mv|clip|explicit|color coded)\b[^\)\]】]*[\)\]】]", re.I)
+_FEAT_TITULO = re.compile(r"\s*[\(\[]?\s*\b(feat\.?|ft\.?|featuring)\s[^\)\]]*[\)\]]?", re.I)
+_LRC_TIEMPO = re.compile(r"\[\d{1,3}:\d{2}(?:[.:]\d{1,3})?\]")
+_LRC_CREDITOS = re.compile(r"^\s*(作词|作曲|编曲|制作人|制作|监制|混音|母带|和声|录音|出品|发行|词|曲)\s*[:：]")
+
+def _lrc_ts(segundos):
+    cs = int(round(max(segundos, 0) * 100))
+    m, cs = divmod(cs, 6000)
+    return f"{m:02}:{cs // 100:02}.{cs % 100:02}"
+
+def _lrc_a_texto(lrc):
+    """
+    LRC -> letra sola (sin tiempos ni etiquetas [ar:]). Las líneas vacías y las
+    de solo ♪ (partes instrumentales) quedan como separación entre estrofas.
+    """
+    salida = []
+    for linea in (lrc or "").splitlines():
+        if re.match(r"^\s*\[[a-zA-Z]+:.*\]\s*$", linea):
+            continue
+        texto = _LRC_TIEMPO.sub("", linea).strip()
+        if texto.strip("♪♫ ") == "":
+            texto = ""
+        if texto or (salida and salida[-1]):
+            salida.append(texto)
+    return "\n".join(salida).strip()
+
+def _letra_tiene_estrofas(texto):
+    """True si la letra ya separa las estrofas con líneas en blanco (o es tan corta que da igual)."""
+    lineas = (texto or "").strip().splitlines()
+    return sum(1 for l in lineas if l.strip()) < 12 or any(not l.strip() for l in lineas)
+
+def _letra_plana(resultado):
+    """
+    La letra sin tiempos. Si la versión plana viene toda junta y la sincronizada
+    marca las pausas (♪ o líneas vacías), se arma desde la sincronizada.
+    """
+    plano = _letra_limpiar(resultado.get("plain") or "")
+    synced = _letra_limpiar(resultado.get("synced") or "")
+    if synced and not _letra_tiene_estrofas(plano):
+        desde_synced = _lrc_a_texto(synced)
+        if _letra_tiene_estrofas(desde_synced):
+            return desde_synced
+    return plano or _lrc_a_texto(synced)
+
+def _letra_limpiar(texto):
+    """Quita las líneas de créditos que agregan algunos proveedores (作词 : …)."""
+    lineas = [l for l in (texto or "").splitlines() if not _LRC_CREDITOS.match(_LRC_TIEMPO.sub("", l))]
+    return "\n".join(lineas).strip()
+
+def _normalizar_nombre(texto):
+    return re.sub(r"[^0-9a-záéíóúüñ]+", " ", str(texto or "").lower()).strip()
+
+def _nombres_parecidos(a, b, minimo=0.6):
+    import difflib
+    a, b = _normalizar_nombre(a), _normalizar_nombre(b)
+    if not a or not b:
+        return False
+    return a in b or b in a or difflib.SequenceMatcher(None, a, b).ratio() >= minimo
+
+def _http_json(url, timeout=15):
+    """GET que devuelve el JSON (None si el servidor dice 404)."""
+    import urllib.error
+    import urllib.request
+    peticion = urllib.request.Request(url, headers={"User-Agent": _DMT_USER_AGENT,
+                                                    "Accept": "application/json"})
+    try:
+        with urllib.request.urlopen(peticion, timeout=timeout) as resp:
+            return json.loads(resp.read().decode("utf-8", "replace"))
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            return None
+        raise
+
+def _cancion_desde_info(info):
+    """Título, artista, álbum y duración de una canción a partir de lo que devuelve yt-dlp."""
+    duracion = info.get("duration")
+    extractor = str(info.get("extractor_key") or info.get("extractor") or "").lower()
+    video_id = info.get("id") if "youtube" in extractor else None
+    titulo = (info.get("track") or "").strip()
+    artistas = info.get("artists") or ([info["artist"]] if info.get("artist") else [])
+    artista = str(artistas[0] if artistas else "").strip()
+    if not (titulo and artista):
+        crudo = _RUIDO_TITULO.sub("", info.get("title") or "").strip()
+        for sep in (" - ", " – ", " — ", " | "):
+            if sep in crudo:
+                artista, titulo = (x.strip() for x in crudo.split(sep, 1))
+                break
+        else:
+            titulo = crudo
+            artista = re.sub(r"\s*(-\s*topic|vevo|official)\s*$", "",
+                             info.get("channel") or info.get("uploader") or "", flags=re.I).strip()
+    titulo = _FEAT_TITULO.sub("", titulo).strip(" \"'“”")
+    return {"titulo": titulo, "artista": artista, "album": info.get("album"),
+            "duracion": duracion, "video_id": video_id}
+
+def _letra_lrclib(cancion, con_tiempos=True):
+    """LRCLIB (lrclib.net): API abierta y gratuita, con letras sincronizadas."""
+    import urllib.parse
+    titulo, artista = cancion.get("titulo"), cancion.get("artista")
+    duracion = cancion.get("duracion")
+
+    def _resultado(d):
+        if d.get("instrumental"):
+            return {"synced": None, "plain": "(Instrumental)", "fuente": "LRCLIB"}
+        return {"synced": d.get("syncedLyrics"), "plain": d.get("plainLyrics"), "fuente": "LRCLIB"}
+
+    # 1) Coincidencia exacta: canción + artista + álbum + duración (±2 s)
+    if titulo and artista and cancion.get("album") and duracion:
+        d = _http_json(f"{_LRCLIB_API}/get?" + urllib.parse.urlencode({
+            "track_name": titulo, "artist_name": artista, "album_name": cancion["album"],
+            "duration": int(round(duracion))}))
+        if isinstance(d, dict) and (d.get("plainLyrics") or d.get("syncedLyrics") or d.get("instrumental")):
+            return _resultado(d)
+    # 2) Búsqueda: el resultado del mismo nombre y artista con la duración más parecida
+    resultados = []
+    if titulo and artista:
+        resultados = _http_json(f"{_LRCLIB_API}/search?" + urllib.parse.urlencode(
+            {"track_name": titulo, "artist_name": artista})) or []
+    if not resultados and titulo:
+        resultados = _http_json(f"{_LRCLIB_API}/search?" + urllib.parse.urlencode(
+            {"q": f"{artista or ''} {titulo}".strip()})) or []
+    candidatos = [r for r in resultados if isinstance(r, dict)
+                  and (r.get("plainLyrics") or r.get("syncedLyrics") or r.get("instrumental"))
+                  and _nombres_parecidos(r.get("trackName"), titulo)
+                  and (not artista or _nombres_parecidos(r.get("artistName"), artista, 0.5))]
+    if not candidatos:
+        return None
+    if duracion:
+        # Los videos musicales suelen traer intro: tolerancia amplia
+        candidatos.sort(key=lambda r: (abs((r.get("duration") or 0) - duracion) > 15,
+                                       not r.get("syncedLyrics"),
+                                       abs((r.get("duration") or 0) - duracion)))
+    else:
+        candidatos.sort(key=lambda r: not r.get("syncedLyrics"))
+    return _resultado(candidatos[0])
+
+def _letra_ytmusic(cancion, con_tiempos=True):
+    """
+    YouTube Music (vía ytmusicapi): letras con licencia, muchas veces con tiempos.
+    Sin tiempos se pide la versión plana: es la que separa las estrofas (la
+    sincronizada viene renglón por renglón, sin líneas en blanco).
+    """
+    from ytmusicapi import YTMusic
+    yt = YTMusic()
+    ids = [cancion["video_id"]] if cancion.get("video_id") else []
+    # El video musical casi nunca trae letra; su versión de audio en YT Music sí
+    try:
+        encontrados = yt.search(f"{cancion.get('artista') or ''} {cancion.get('titulo') or ''}".strip(),
+                                filter="songs", limit=3) or []
+    except Exception:
+        encontrados = []
+    for r in encontrados[:3]:
+        vid = r.get("videoId")
+        if vid and vid not in ids and _nombres_parecidos(r.get("title"), cancion.get("titulo")):
+            ids.append(vid)
+    for vid in ids[:3]:
+        browse_id = (yt.get_watch_playlist(videoId=vid, limit=1) or {}).get("lyrics")
+        if not browse_id:
+            continue
+        letra = None
+        if con_tiempos:
+            try:
+                letra = yt.get_lyrics(browse_id, timestamps=True)
+            except Exception:
+                letra = None
+        if not (letra and letra.get("hasTimestamps")):
+            letra = yt.get_lyrics(browse_id) or letra
+        if not letra:
+            continue
+        fuente = "YouTube Music"
+        if letra.get("source"):
+            fuente += f" ({str(letra['source']).replace('Source: ', '')})"
+        lineas = letra.get("lyrics")
+        if letra.get("hasTimestamps") and isinstance(lineas, list):
+            synced = "\n".join(f"[{_lrc_ts(l.start_time / 1000)}] {l.text}".rstrip() for l in lineas)
+            return {"synced": synced, "plain": _lrc_a_texto(synced), "fuente": fuente}
+        if isinstance(lineas, str) and lineas.strip():
+            return {"synced": None, "plain": lineas.strip(), "fuente": fuente}
+    return None
+
+def _letra_otros(cancion, con_tiempos=True):
+    """Otros proveedores a través de syncedlyrics (NetEase, Megalobiz, Musixmatch, Genius)."""
+    import syncedlyrics
+    texto = syncedlyrics.search(f"{cancion.get('titulo') or ''} {cancion.get('artista') or ''}".strip(),
+                                providers=["NetEase", "Megalobiz", "Musixmatch", "Genius"])
+    texto = _letra_limpiar(texto)
+    if not texto:
+        return None
+    if re.search(r"^\s*\[\d{1,3}:\d{2}", texto, re.M):
+        return {"synced": texto, "plain": _lrc_a_texto(texto), "fuente": "syncedlyrics"}
+    return {"synced": None, "plain": texto, "fuente": "syncedlyrics"}
+
+def _buscar_letra(cancion, con_tiempos, log=print):
+    """
+    Busca la letra en 1) LRCLIB, 2) YouTube Music y 3) otros proveedores. Nunca
+    lanza: cada fuente que falla se anota en el log y se pasa a la siguiente.
+      · Con tiempos (.lrc): sigue buscando si solo encontró la letra sin tiempos
+        (y si nadie la tiene con tiempos, devuelve la mejor sin tiempos).
+      · Solo letra (.txt): si la letra viene toda junta, sin separar las
+        estrofas, prueba la siguiente fuente (YouTube Music casi siempre las
+        separa); si ninguna las separa, se queda con la primera.
+    Devuelve {'synced', 'plain', 'fuente'} o None.
+    """
+    reserva = None
+    fuentes = [("LRCLIB", _letra_lrclib), ("YouTube Music", _letra_ytmusic),
+               ("otros proveedores", _letra_otros)]
+    if con_tiempos and cancion.get("video_id"):
+        fuentes[0], fuentes[1] = fuentes[1], fuentes[0]
+    for nombre, fn in fuentes:
+        if reserva and not con_tiempos and fn is _letra_otros:
+            break                   # ya hay letra: los demás proveedores tampoco suelen separar estrofas
+        try:
+            r = fn(cancion, con_tiempos)
+        except Exception as e:
+            log(f"   · {nombre}: no respondió ({type(e).__name__}: {str(e)[:90]})")
+            continue
+        if not r or not (r.get("synced") or r.get("plain")):
+            log(f"   · {nombre}: sin resultados")
+            continue
+        if con_tiempos:
+            if r.get("synced"):
+                return r
+            log(f"   · {nombre}: solo la letra sin tiempos; se sigue buscando…")
+        else:
+            if _letra_tiene_estrofas(_letra_plana(r)):
+                return r
+            log(f"   · {nombre}: la letra viene sin separar las estrofas; se prueba otra fuente…")
+        reserva = reserva or r
+    return reserva
+
+def _yt_es_ytmusic(url):
+    """True si el enlace es de YouTube Music (music.youtube.com)."""
+    return "music.youtube.com" in str(url or "").lower()
+
+def _letra_a_cues(lrc, maximo=8.0):
+    """LRC -> [[inicio, fin, texto]] para una pista de subtítulos (cada línea dura hasta la siguiente)."""
+    lineas = []
+    for linea in (lrc or "").splitlines():
+        tiempos = re.findall(r"\[(\d{1,3}):(\d{2})(?:[.:](\d{1,3}))?\]", linea)
+        texto = _LRC_TIEMPO.sub("", linea).strip()
+        for mi, se, frac in tiempos:
+            lineas.append((int(mi) * 60 + int(se) + (int(frac.ljust(3, "0")[:3]) / 1000 if frac else 0), texto))
+    lineas.sort(key=lambda x: x[0])
+    cues = []
+    for i, (t, texto) in enumerate(lineas):
+        if not texto or not texto.strip("♪♫ "):
+            continue
+        fin = lineas[i + 1][0] if i + 1 < len(lineas) else t + 5
+        cues.append([t, max(min(fin, t + maximo), t + 0.5), texto])
+    return cues
+
+def _letra_para_incrustar(info, log=print):
+    """(letra con tiempos, letra sola) de la canción de un video, o (None, None) si no aparece."""
+    cancion = _cancion_desde_info(info or {})
+    if not cancion.get("titulo"):
+        return None, None
+    try:
+        r = _buscar_letra(cancion, True, log=log)
+    except Exception as e:
+        log(f"   · búsqueda de letra fallida: {e}")
+        r = None
+    if not r:
+        return None, None
+    synced = _letra_limpiar(r.get("synced") or "") or None
+    return synced, (_letra_plana(r) or None)
+
+def _letra_texto_final(resultado, cancion, con_tiempos):
+    """(texto, extensión, con_tiempos_real) listo para guardar."""
+    synced = _letra_limpiar(resultado.get("synced") or "")
+    if con_tiempos and synced:
+        cabecera = [f"[ar:{cancion.get('artista') or ''}]", f"[ti:{cancion.get('titulo') or ''}]"]
+        if cancion.get("album"):
+            cabecera.append(f"[al:{cancion['album']}]")
+        if cancion.get("duracion"):
+            cabecera.append(f"[length:{int(cancion['duracion']) // 60:02}:{int(cancion['duracion']) % 60:02}]")
+        cabecera.append("[re:DEUS MACHINA | TOOLS]")
+        cuerpo = [l for l in synced.splitlines() if not re.match(r"^\s*\[[a-zA-Z]+:.*\]\s*$", l)]
+        return "\n".join(cabecera + cuerpo).strip() + "\n", ".lrc", True
+    plano = _letra_plana(resultado)
+    return plano.strip() + "\n", ".txt", False
+
+# Descargas de YouTube (y demás sitios de yt-dlp) que pueden estar BAJANDO a la
+# vez. Las que ya bajaron y solo están convirtiendo o empaquetando no cuentan: al
+# llegar a ese paso sueltan su lugar y arranca la siguiente de la cola. Spotify no
+# pasa por esta cola: cada canción se busca y se baja aparte (ya es lento de por sí).
 YT_MAX_DESCARGAS = 3
 
 
@@ -2171,6 +3195,7 @@ def _dmt_despachar_modulo_si_corresponde():
     if modulo not in _DMT_MODULOS_PERMITIDOS:
         os._exit(2)
     _dmt_stdio_para_subproceso()
+    _dmt_subprocesos_sin_ventana()      # FFmpeg de spotDL sin ventanas negras que parpadean
     sys.argv = [modulo] + sys.argv[3:]
     codigo = 0
     try:
@@ -2212,6 +3237,168 @@ def _startup_info_modulo():
         si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
         return si
     return None
+
+def _proc_matar_arbol(proc):
+    """
+    Mata un proceso Y sus hijos (spotDL lanza FFmpeg; con kill() solo, esa
+    conversión seguía corriendo sola después de cancelar).
+    """
+    if proc is None:
+        return
+    try:
+        if proc.poll() is not None:
+            return
+    except Exception:
+        pass
+    if os.name == "nt":
+        try:
+            subprocess.run(["taskkill", "/F", "/T", "/PID", str(proc.pid)],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=15,
+                           creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        except Exception:
+            pass
+    try:
+        proc.kill()
+    except Exception:
+        pass
+
+def _correr_cancelable(cmd, debe_parar=None, timeout=None, on_proceso=None, **kwargs):
+    """
+    Como subprocess.run(cmd, capture_output=True, ...) pero se puede cortar: si
+    debe_parar() se vuelve True, mata el proceso (y sus hijos) y lanza
+    _YtDetenido; si pasa 'timeout', lanza subprocess.TimeoutExpired.
+    on_proceso(proc) recibe el proceso al arrancar y None al terminar.
+    """
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, **kwargs)
+    if on_proceso:
+        on_proceso(proc)
+    inicio = time.time()
+    try:
+        while True:
+            try:
+                out, err = proc.communicate(timeout=0.3)
+                break
+            except subprocess.TimeoutExpired:
+                parar = bool(debe_parar and debe_parar())
+                vencido = bool(timeout and time.time() - inicio > timeout)
+                if not (parar or vencido):
+                    continue
+                _proc_matar_arbol(proc)
+                try:
+                    proc.communicate(timeout=5)
+                except Exception:
+                    pass
+                if parar:
+                    raise _YtDetenido("Detenido por usuario")
+                raise subprocess.TimeoutExpired(cmd, timeout)
+    finally:
+        if on_proceso:
+            on_proceso(None)
+    return subprocess.CompletedProcess(cmd, proc.returncode, out, err)
+
+def _dmt_subprocesos_sin_ventana():
+    """
+    Proceso hijo sin consola (spotDL dentro del .exe compilado): cada programa de
+    consola que lance (FFmpeg para convertir cada canción) abría su propia ventana
+    negra que aparecía y se cerraba al instante. Aquí todos se lanzan sin ventana.
+    """
+    if os.name != "nt":
+        return
+    original = subprocess.Popen.__init__
+    if getattr(original, "_dmt_sin_ventana", False):
+        return
+    sin_ventana = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
+    con_consola = (getattr(subprocess, "CREATE_NEW_CONSOLE", 0x10)
+                   | getattr(subprocess, "DETACHED_PROCESS", 0x08))
+
+    def __init__(self, *args, **kwargs):
+        if len(args) < 14:          # creationflags no vino como argumento posicional
+            flags = kwargs.get("creationflags") or 0
+            if not flags & con_consola:
+                kwargs["creationflags"] = flags | sin_ventana
+        original(self, *args, **kwargs)
+
+    __init__._dmt_sin_ventana = True
+    subprocess.Popen.__init__ = __init__
+
+def _dmt_sin_consola():
+    """True si este proceso no tiene consola visible (app compilada, pythonw, procesos hijos)."""
+    if os.name != "nt":
+        return False
+    try:
+        return not ctypes.windll.kernel32.GetConsoleWindow()
+    except Exception:
+        return False
+
+# App compilada (sin consola) y sus procesos hijos (motor OCR, spotDL): CUALQUIER
+# programa de consola que se lance —FFmpeg, el Deno con el que yt-dlp resuelve los
+# retos de YouTube, el "where ccache" que corre PaddlePaddle al cargarse, el "ver"
+# de Python…— abría su propia ventana negra que aparecía y se cerraba al instante.
+# Pedir la ventana "oculta" no alcanza en Windows 11 con Terminal como consola.
+if _dmt_sin_consola():
+    _dmt_subprocesos_sin_ventana()
+
+def _spotdl_extraer_json(texto):
+    """
+    spotDL mezcla líneas de log con el JSON en la misma salida, y esas líneas de
+    log también traen '[' (ej. '[download] ...'), así que agarrar el primer '['
+    rompe el parseo. Se prueba cada posición candidata hasta que una decodifique.
+    """
+    texto = (texto or "").strip()
+    if not texto:
+        return []
+    dec = json.JSONDecoder()
+    posiciones = [i for i, ch in enumerate(texto) if ch in '[{'][:300]
+    for i in posiciones:
+        try:
+            datos, _ = dec.raw_decode(texto[i:])
+        except Exception:
+            continue
+        if isinstance(datos, list) and datos:
+            return datos
+        if isinstance(datos, dict):
+            posibles = datos.get("songs") or []
+            if posibles:
+                return posibles
+    return []
+
+def _spotdl_listar(url, base_args, debe_parar=None, carpeta_tmp=None, extra=(), on_proceso=None):
+    """
+    Canciones de un enlace de Spotify con `spotdl save` (no baja audio, solo la
+    metadata). Se puede cortar con debe_parar() (lanza _YtDetenido). Sin buscar
+    letras (--lyrics sin proveedores): aquí no sirven y buscarlas canción por
+    canción era lo que más tardaba el paso "Analizando".
+    extra: argumentos adicionales (ej. --preload para traer el enlace de YouTube).
+    Devuelve la lista de canciones (dicts); [] si no se pudo.
+    """
+    args = list(base_args) + list(extra) + ["--lyrics"]
+    kw = dict(text=True, encoding="utf-8", errors="ignore",
+              startupinfo=_startup_info_modulo(), env=_env_subproceso_utf8())
+    cmd = _cmd_modulo_python("spotdl") + ["save", url]
+
+    # spotDL admite "--save-file -" para imprimir el JSON por stdout en vez de
+    # escribirlo a disco (más confiable que depender de la ruta del archivo).
+    r = _correr_cancelable(cmd + ["--save-file", "-"] + args, debe_parar,
+                           timeout=300, on_proceso=on_proceso, **kw)
+    canciones = [c for c in _spotdl_extraer_json(r.stdout) if isinstance(c, dict)]
+    if canciones or not carpeta_tmp:
+        return canciones
+
+    # Respaldo: con archivo, si stdout no sirvió
+    save_file = os.path.join(carpeta_tmp, "lista.spotdl")
+    r2 = _correr_cancelable(cmd + ["--save-file", save_file] + args, debe_parar,
+                            timeout=300, on_proceso=on_proceso, **kw)
+    if os.path.exists(save_file):
+        try:
+            with open(save_file, "r", encoding="utf-8") as f:
+                canciones = [c for c in _spotdl_extraer_json(f.read()) if isinstance(c, dict)]
+        except Exception as fe:
+            print(f"[Spotify] No se pudo leer el archivo de lista: {fe}")
+    if not canciones:
+        print(f"[Spotify] 'save' no devolvió canciones.")
+        print(f"[Spotify]   stdout: {(r2.stdout or '')[:300]}")
+        print(f"[Spotify]   stderr: {(r2.stderr or '')[:300]}")
+    return canciones
 
 def asegurar_spotdl_disponible(status_cb=None):
     """
@@ -2341,6 +3528,22 @@ def cargar_librerias_pesadas_global(progress_callback=None):
 #  TIER-2: carga en background una vez que la ventana principal ya es visible
 # ==============================================================================
 _tier2_listo = threading.Event()  # se activa cuando torch/whisper/ytdlp están listos
+_TIER2_HILO = None
+_TIER2_LOCK = threading.Lock()
+
+def _iniciar_tier2():
+    """
+    Arranca la carga de Tier-2 UNA sola vez. Se llama al terminar el splash (así
+    carga mientras se arma la ventana principal) y, por si acaso, desde App.
+    Tiene que ir DESPUÉS de configurar_ffmpeg_local(): ahí se registra la copia
+    actualizada de yt-dlp, que debe quedar antes de importarlo.
+    """
+    global _TIER2_HILO
+    with _TIER2_LOCK:
+        if _TIER2_HILO is None:
+            _TIER2_HILO = threading.Thread(target=_cargar_tier2_background,
+                                           name="dmt_tier2", daemon=True)
+            _TIER2_HILO.start()
 
 def _cargar_tier2_background():
     """
@@ -2430,6 +3633,9 @@ class GestorModelosIA:
         self._cond = threading.Condition(threading.RLock())
         self._mods = {}
         self._vigilante = None
+        # Botón "Liberar modelo de IA" pedido mientras algo trabajaba
+        self._liberar_todo = False
+        self._hay_mas_trabajo = None
 
     def registrar(self, nombre, liberar):
         with self._cond:
@@ -2490,8 +3696,65 @@ class GestorModelosIA:
                     m["en_uso"] = max(0, m["en_uso"] - 1)
                     m["ultimo"] = time.time()
                     liberar_ahora = m["en_uso"] == 0 and m["pendiente"] and m["cargado"]
+                # Botón "Liberar modelo de IA" pendiente: ¿era el último trabajando?
+                revisar_todo = (self._liberar_todo
+                                and not any(x["en_uso"] > 0 for x in self._mods.values()))
             if liberar_ahora:
                 self._liberar(nombre, "otro módulo cargó su modelo mientras trabajaba")
+            if revisar_todo:
+                self._liberar_todo_si_no_queda_trabajo()
+
+    def liberar_todo_al_terminar(self, hay_mas_trabajo=None):
+        """
+        Botón "Liberar modelo de IA" (el modelo que sea: Whisper, OCR o Quitar
+        fondo). Si ningún módulo de IA está trabajando ni esperando turno, libera
+        YA todo lo cargado; si no, queda pedido y se libera en cuanto termine el
+        último trabajo. hay_mas_trabajo(): True si alguien espera turno de IA.
+        Devuelve "ahora", "al_terminar" o "nada" (no había modelo cargado).
+        """
+        with self._cond:
+            ocupado = any(m["en_uso"] > 0 for m in self._mods.values())
+            hay_cargado = any(m["cargado"] for m in self._mods.values())
+        if not ocupado and hay_mas_trabajo is not None:
+            try:
+                ocupado = bool(hay_mas_trabajo())
+            except Exception:
+                pass
+        if ocupado:
+            with self._cond:
+                self._liberar_todo = True
+                self._hay_mas_trabajo = hay_mas_trabajo
+            # Por si justo terminó entre la revisión y el pedido
+            self._liberar_todo_si_no_queda_trabajo()
+            return "al_terminar"
+        if not hay_cargado:
+            return "nada"
+        self._liberar_cargados("lo pidió el usuario")
+        return "ahora"
+
+    def liberacion_pendiente(self):
+        """True mientras el botón "Liberar modelo de IA" espera a que termine un trabajo."""
+        with self._cond:
+            return self._liberar_todo
+
+    def _liberar_todo_si_no_queda_trabajo(self):
+        hay_mas = self._hay_mas_trabajo
+        try:
+            if hay_mas is not None and hay_mas():
+                return              # otro espera turno: se libera cuando termine ese
+        except Exception:
+            pass
+        with self._cond:
+            if not self._liberar_todo or any(x["en_uso"] > 0 for x in self._mods.values()):
+                return
+            self._liberar_todo = False
+        self._liberar_cargados("lo pidió el usuario (terminó el trabajo en curso)")
+
+    def _liberar_cargados(self, motivo):
+        with self._cond:
+            nombres = [n for n, m in self._mods.items() if m["cargado"]]
+        for n in nombres:
+            self._liberar(n, motivo)
 
     def _liberar(self, nombre, motivo):
         with self._cond:
@@ -2529,6 +3792,10 @@ class GestorModelosIA:
                             and ahora - m["ultimo"] >= self.INACTIVIDAD_S]
             for n in vencidos:
                 self._liberar(n, "20 minutos sin uso")
+            # Liberación pedida con el botón cuyo trabajo terminó sin avisar
+            # (p. ej. se canceló mientras esperaba turno)
+            if self.liberacion_pendiente():
+                self._liberar_todo_si_no_queda_trabajo()
 
 
 class _TrabajoDetenido(Exception):
@@ -2558,6 +3825,7 @@ class LoteTrabajo:
         self.proceso = None        # proceso externo en curso (FFmpeg, Ghostscript...)
         self.hilo = None
         self.inicio = time.time()
+        self.pistas_audio = {}     # pistas de audio elegidas para usar en los demás archivos
 
     @property
     def nombre(self):
@@ -2581,6 +3849,11 @@ class CarrilIA:
         self._hilo = None           # hilo dueño (para permitir anidar)
         self._veces = 0
         self._cola = []
+
+    def hay_en_espera(self):
+        """True si algún módulo de IA está esperando su turno."""
+        with self._cond:
+            return bool(self._cola)
 
     def ocupado_por(self, salvo=None):
         """Etiqueta de quien está trabajando ahora (None si está libre)."""
@@ -2668,6 +3941,98 @@ def _asegurar_numba_o_sustituto():
     sustituto.__version__ = "0+sustituto-dmt"
     sys.modules["numba"] = sustituto
     print("[rembg] numba no está disponible: se usa un sustituto (sin efecto en Quitar fondo).")
+
+
+REMBG_U2NET_URL = "https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2net.onnx"
+REMBG_U2NET_MD5 = "60024c5c889badc19c04ad937298a77b"      # el mismo que verifica rembg
+
+
+def _rembg_dir_modelos():
+    """%LOCALAPPDATA%/DeusMachinaTools/rembg_models (lo que se le pasa a rembg como U2NET_HOME)."""
+    _local = os.environ.get("LOCALAPPDATA", os.path.expanduser("~"))
+    return os.path.join(_local, "DeusMachinaTools", "rembg_models")
+
+
+def _rembg_ruta_u2net(existente=True):
+    """
+    rembg (2.0.7x+) guarda el modelo en rembg_models/models/u2net/u2net.onnx y
+    todavía lee el de versiones viejas en rembg_models/u2net.onnx.
+    existente=True: la ruta del modelo ya bajado (o None). False: dónde bajarlo.
+    """
+    base = _rembg_dir_modelos()
+    nueva = os.path.join(base, "models", "u2net", "u2net.onnx")
+    if not existente:
+        return nueva
+    for ruta in (nueva, os.path.join(base, "u2net.onnx")):
+        try:
+            if os.path.isfile(ruta) and os.path.getsize(ruta) > 1024 * 1024:
+                return ruta
+        except OSError:
+            pass
+    return None
+
+
+def _rembg_descargar_u2net(on_progreso=None):
+    """
+    Baja u2net.onnx (~170 MB) directo del release oficial de rembg, con avance
+    real. Antes lo bajaba rembg (pooch) recién después de cargar todas sus
+    librerías y sin mostrar nada, y parecía que se quedaba "conectando".
+    Verifica el MD5 oficial y solo al final lo deja en su lugar. Devuelve la ruta.
+    """
+    import urllib.request as _req
+    import hashlib
+    destino = _rembg_ruta_u2net(existente=False)
+    os.makedirs(os.path.dirname(destino), exist_ok=True)
+    parcial = destino + ".part"
+    md5 = hashlib.md5(usedforsecurity=False)
+    try:
+        peticion = _req.Request(REMBG_U2NET_URL, headers={"User-Agent": "Mozilla/5.0"})
+        with _req.urlopen(peticion, timeout=30) as resp, open(parcial, "wb") as fh:
+            total = int(resp.headers.get("Content-Length") or 0)
+            hecho = 0
+            while True:
+                bloque = resp.read(1024 * 1024)
+                if not bloque:
+                    break
+                fh.write(bloque)
+                md5.update(bloque)
+                hecho += len(bloque)
+                if on_progreso:
+                    try:
+                        on_progreso(hecho, total)
+                    except Exception:
+                        pass
+        if md5.hexdigest() != REMBG_U2NET_MD5:
+            raise ValueError("el archivo descargado no coincide con el oficial (MD5)")
+        os.replace(parcial, destino)
+        return destino
+    finally:
+        try:
+            if os.path.exists(parcial):
+                os.remove(parcial)
+        except OSError:
+            pass
+
+
+def _rembg_ubicar_modelo(ruta):
+    """Si la versión de rembg incluida busca el modelo en otra carpeta, se deja ahí."""
+    if not ruta or not os.path.isfile(ruta):
+        return
+    try:
+        from rembg.sessions.u2net import U2netSession as _U2
+        if hasattr(_U2, "model_dir"):
+            esperado = os.path.join(_U2.model_dir(), "u2net.onnx")
+        else:
+            esperado = os.path.join(_U2.u2net_home(), "u2net.onnx")
+    except Exception:
+        return
+    try:
+        if (not os.path.exists(esperado) and os.path.normcase(os.path.abspath(esperado))
+                != os.path.normcase(os.path.abspath(ruta))):
+            os.makedirs(os.path.dirname(esperado), exist_ok=True)
+            os.replace(ruta, esperado)
+    except Exception as e:
+        print(f"[Quitar fondo] No se pudo mover el modelo a {esperado}: {e}")
 
 
 def _rembg_quitar_fondo(img, session, remove_fn):
@@ -3318,8 +4683,41 @@ class TarjetaOpcion(ctk.CTkFrame):
                         pass
 
 
+def _ctk_parche_segmentados():
+    """
+    CustomTkinter 6.0 con Windows escalado (125 %, 150 %) guarda el tamaño de cada
+    botón de un CTkSegmentedButton (las pestañas incluidas) TRUNCADO (86 px -> 68
+    -> 85 px) y lo dibuja 1 px más chico que el botón: esa franja dejaba ver el
+    gris de fondo en las orillas (la rayita abajo a la izquierda y los piquitos de
+    la derecha). Esos botones, los únicos que se dibujan sin redondear a números
+    pares, pasan a guardar el tamaño exacto (con decimales). El resto, igual.
+    """
+    try:
+        from customtkinter.windows.widgets.core_widget_classes import CTkBaseClass
+    except Exception as e:
+        print(f"[UI] Sin el ajuste de los botones segmentados (no crítico): {e}")
+        return
+    original = CTkBaseClass._update_dimensions_event
+    if getattr(original, "_dmt_parche", False):
+        return
+
+    def _update_dimensions_event(self, event):
+        if (getattr(self, "_round_width_to_even_numbers", True)
+                and getattr(self, "_round_height_to_even_numbers", True)):
+            return original(self, event)
+        ancho = self._reverse_widget_scaling(float(event.width))
+        alto = self._reverse_widget_scaling(float(event.height))
+        if abs(self._current_width - ancho) > 0.01 or abs(self._current_height - alto) > 0.01:
+            self._current_width, self._current_height = ancho, alto
+            self._draw(no_color_updates=True)
+
+    _update_dimensions_event._dmt_parche = True
+    CTkBaseClass._update_dimensions_event = _update_dimensions_event
+
+
 # Configuración inicial de estilo
 _dmt_preparar_stdio_hijo()
+_ctk_parche_segmentados()
 
 ctk.set_appearance_mode("Dark")
 ctk.set_default_color_theme("blue")
@@ -3717,6 +5115,19 @@ def vid_info(ruta):
     if a:
         info["acodec"] = a.get("codec_name")
         info["abr"] = _num(a.get("bit_rate"), int)
+    # Todas las pistas de audio (películas y videos doblados traen varias)
+    info["audios"] = [{"codec": s.get("codec_name"), "canales": _num(s.get("channels"), int),
+                       "idioma": (s.get("tags") or {}).get("language"),
+                       "titulo": (s.get("tags") or {}).get("title"),
+                       "abr": _num(s.get("bit_rate"), int),
+                       "defecto": bool((s.get("disposition") or {}).get("default"))}
+                      for s in streams if s.get("codec_type") == "audio"]
+    info["subs"] = [s.get("codec_name") for s in streams if s.get("codec_type") == "subtitle"]
+    info["subs_info"] = [{"codec": s.get("codec_name"), "idioma": (s.get("tags") or {}).get("language"),
+                          "titulo": (s.get("tags") or {}).get("title"),
+                          "defecto": bool((s.get("disposition") or {}).get("default")),
+                          "forzado": bool((s.get("disposition") or {}).get("forced"))}
+                         for s in streams if s.get("codec_type") == "subtitle"]
     return info
 
 
@@ -3974,12 +5385,89 @@ class SplashScreen(tk.Toplevel):
 
 
 
-def _transcribe_safe(model, audio, **kwargs):
+class _SegmentoDMT:
+    """Trozo de transcripción con los mismos campos que usan las pantallas."""
+    __slots__ = ("start", "end", "text")
+
+    def __init__(self, start, end, text):
+        self.start, self.end, self.text = start, end, text
+
+
+def _partir_segmento(seg, max_dur=6.0, max_chars=84):
+    """
+    El modo por lotes devuelve trozos de hasta 30 s: con los tiempos de cada
+    palabra se parten en renglones de subtítulo normales (hasta ~6 s u 84
+    caracteres, cortando en pausas o al terminar una frase).
+    """
+    palabras = [w for w in (getattr(seg, "words", None) or []) if w.word.strip()]
+    if not palabras or (seg.end - seg.start) <= max_dur:
+        return [seg]
+    trozos, actual = [], []
+    for w in palabras:
+        if actual:
+            texto = "".join(x.word for x in actual)
+            fin_de_frase = (texto.rstrip().endswith((".", "?", "!", "…", "。", "？", "！"))
+                            and actual[-1].end - actual[0].start >= 1.5)
+            if (w.end - actual[0].start > max_dur or len(texto) + len(w.word) > max_chars
+                    or w.start - actual[-1].end > 0.6 or fin_de_frase):
+                trozos.append(_SegmentoDMT(actual[0].start, actual[-1].end, texto.strip()))
+                actual = []
+        actual.append(w)
+    if actual:
+        trozos.append(_SegmentoDMT(actual[0].start, actual[-1].end,
+                                   "".join(x.word for x in actual).strip()))
+    return trozos
+
+
+def _transcribe_por_lotes(model, audio, **kwargs):
+    """
+    Modo rápido: BatchedInferencePipeline de faster-whisper. El audio se corta
+    por la voz (VAD) y varios trozos se transcriben A LA VEZ en la GPU (8 por
+    tanda; 4 en CPU), en vez de uno detrás de otro. Medido con 6 min de voz:
+    GPU (small) 21 s -> 4.3 s y CPU (base) 38 s -> 21 s, con el mismo acierto.
+    Se piden los tiempos por palabra (casi no cuestan) para que los .srt/.vtt
+    salgan en renglones normales. Si el primer lote falla (por ejemplo, sin
+    memoria de video), se sigue en el modo normal sin perder nada.
+    """
+    from faster_whisper import BatchedInferencePipeline
+    originales = dict(kwargs)
+    en_gpu = str(getattr(getattr(model, "model", None), "device", "")).lower() == "cuda"
+    kwargs["vad_filter"] = True          # el modo por lotes corta el audio por la voz
+    kwargs["word_timestamps"] = True
+    segmentos, info = BatchedInferencePipeline(model=model).transcribe(
+        audio, batch_size=8 if en_gpu else 4, **kwargs)
+
+    def _con_respaldo():
+        it = iter(segmentos)
+        try:
+            primero = next(it)
+        except StopIteration:
+            return
+        except Exception as e:
+            print(f"[Whisper] Modo rápido falló al empezar ({e}); se sigue en modo normal.")
+            normales, _ = _transcribe_safe(model, audio, **originales)
+            yield from normales
+            return
+        yield from _partir_segmento(primero)
+        for seg in it:
+            yield from _partir_segmento(seg)
+
+    return _con_respaldo(), info
+
+
+def _transcribe_safe(model, audio, rapido=False, **kwargs):
         """
         Wrapper para faster_whisper.transcribe() que hace fallback sin VAD
         si onnxruntime no está disponible en el entorno frozen (exe compilado).
         Si la versión instalada no conoce 'multilingual', reintenta sin esa opción.
+        rapido=True: modo por lotes (2-4x más rápido en archivos largos con GPU);
+        si no se puede usar, sigue en el modo normal.
         """
+        if rapido:
+            try:
+                return _transcribe_por_lotes(model, audio, **kwargs)
+            except Exception as e:
+                print(f"[Whisper] Modo rápido no disponible ({e}); se usa el normal.")
         try:
             return model.transcribe(audio, **kwargs)
         except TypeError as e:
@@ -4200,7 +5688,12 @@ def _mlab_dec(val):
     if val is None:
         return ""
     if isinstance(val, bytes):
-        for enc in ("utf-8", "utf-16", "latin-1"):
+        # UTF-16 solo si trae BOM: sin él, un texto cp1252/Latin-1 de longitud par
+        # ("José", "González") se "decodificaba" como UTF-16 y salían ideogramas.
+        encs = ("utf-8", "cp1252", "latin-1")
+        if val[:2] in (b"\xff\xfe", b"\xfe\xff"):
+            encs = ("utf-16",) + encs
+        for enc in encs:
             try:
                 return val.decode(enc).replace("\x00", "").strip()
             except Exception:
@@ -4209,6 +5702,26 @@ def _mlab_dec(val):
     if isinstance(val, (list, tuple)):
         return ", ".join(_mlab_dec(v) for v in val if v not in (None, ""))
     return str(val).strip()
+
+
+def _mlab_ascii_tag_bytes(text):
+    """Texto -> bytes para un tag EXIF/TIFF de tipo ASCII (Artist, Copyright, Software...).
+    La norma solo define ASCII de 7 bits, pero en la práctica el texto con acentos o
+    símbolos (©, ñ, é...) se guarda en cp1252, que es lo que leen el Explorador de
+    Windows, Adobe y Pillow. Si algún carácter no cabe en cp1252 (ł, kanji, emoji...)
+    se guarda todo en UTF-8 en vez de perderlo con '?'. _mlab_dec distingue ambos casos."""
+    text = "" if text is None else str(text)
+    try:
+        raw = text.encode("cp1252")
+    except UnicodeEncodeError:
+        return text.encode("utf-8")
+    if not raw.isascii():
+        try:
+            raw.decode("utf-8")           # ambiguo: esos bytes cp1252 también son UTF-8 válido
+            return text.encode("utf-8")
+        except UnicodeDecodeError:
+            pass
+    return raw
 
 
 # ------------------------------------------------------------------------------
@@ -4423,12 +5936,8 @@ def _exif_write_fields(path, values):
                 raise ValueError(f"'{catalog[key][1]}' debe tener formato AAAA:MM:DD HH:MM:SS")
             exif[ifd][tag] = txt.encode("ascii")
         else:
-            try:
-                exif[ifd][tag] = val.encode("ascii")
-            except UnicodeEncodeError:
-                # Los tags ASCII de EXIF no admiten UTF-8; se transcribe lo que
-                # se pueda en vez de escribir bytes inválidos en el archivo.
-                exif[ifd][tag] = val.encode("ascii", "replace")
+            # Tags ASCII: acentos y símbolos (©, ñ, é...) ya no se sustituyen por '?'
+            exif[ifd][tag] = _mlab_ascii_tag_bytes(val)
 
     if exif.get("thumbnail") is None:
         exif["1st"] = {}
@@ -4686,13 +6195,25 @@ def _tiff_is_lossy(path):
         return False
 
 
+def _tiff_text(val):
+    """Pillow entrega los tags ASCII ya decodificados como Latin-1 (un '©' o una 'á'
+    guardados en UTF-8 salían como 'Â©' / 'Ã¡'). Se recuperan los bytes originales
+    y se decodifican bien."""
+    if isinstance(val, str):
+        try:
+            return _mlab_dec(val.encode("latin-1"))
+        except UnicodeEncodeError:
+            pass
+    return _mlab_dec(val)
+
+
 def _tiff_read_fields(path):
     from PIL import Image as _I
     fields = []
     with _I.open(path) as im:
         tags = getattr(im, "tag_v2", {}) or {}
         for key, label, tag, group, sens in _TIFF_CATALOG:
-            val = _mlab_dec(tags.get(tag))
+            val = _tiff_text(tags.get(tag))
             if val:
                 fields.append(mlab_field(key, label, val, "text", group, sens))
         if 34853 in tags:
@@ -4729,13 +6250,20 @@ def _tiff_save(path, dst, new_tags=None, strip=False):
             if tag in (34853, 700, 33723, 37724):   # GPS, XMP, IPTC, Photoshop
                 continue
             try:
-                ifd[tag] = src_tags[tag]
+                val = src_tags[tag]
+                # Pillow entrega los tags ASCII decodificados como Latin-1: se devuelven
+                # a sus bytes originales para no degradar los acentos de campos que no
+                # se editaron (DocumentName, HostComputer...).
+                if isinstance(val, str) and src_tags.tagtype.get(tag) == 2:   # 2 = ASCII
+                    ifd.tagtype[tag] = 2       # evita que Pillow infiera BYTE en tags desconocidos
+                    val = val.encode("latin-1")
+                ifd[tag] = val
             except Exception:
                 pass
         if not strip:
             for tag, val in (new_tags or {}).items():
                 if val:
-                    ifd[tag] = str(val)
+                    ifd[tag] = _mlab_ascii_tag_bytes(val)
     tmp = _mlab_tmp_for(dst)
     try:
         head = frames[0]
@@ -5898,11 +7426,18 @@ def mlab_analyze(path):
 #   VentanaSecundaria nace oculta y transparente, se rellena, espera a que CTk
 #   termine esos ciclos y recién entonces aparece de golpe, ya dibujada.
 # ==============================================================================
+def _cuando_quieta(app, fn):
+    """Ejecuta fn cuando la interfaz terminó de acomodar y dibujar lo pendiente."""
+    app.after_idle(lambda: app.after(40, lambda: app.after_idle(fn)))
+
+
 class VentanaSecundaria(ctk.CTkToplevel):
 
     def __init__(self, *args, **kwargs):
         self._dmt_ciclos = 0            # ciclos oculta/muestra de CTk en curso
         self._dmt_resizable_pend = 0    # ciclos programados por resizable() sin empezar
+        self._dmt_dibujada = False      # CTk ya dibujó sus widgets (se mostró al menos una vez)
+        self._dmt_mostrando = False     # se pidió mostrarla (y no se volvió a ocultar)
         super().__init__(*args, **kwargs)
         self.withdraw()                 # CTk la deja oculta al terminar su primer ciclo
         try:
@@ -5945,6 +7480,7 @@ class VentanaSecundaria(ctk.CTkToplevel):
                 return
         except Exception:
             return
+        self._dmt_mostrando = True
         if self._dmt_ocupada() and _intentos < 80:
             app.after(15, lambda: self.dmt_mostrar(app, _intentos + 1))
             return
@@ -5959,18 +7495,65 @@ class VentanaSecundaria(ctk.CTkToplevel):
             return
 
         def _revelar():
+            self._dmt_dibujada = True
             try:
-                if not self.winfo_exists():
+                if not self.winfo_exists() or not self._dmt_mostrando:
                     return
                 self.attributes("-alpha", 1.0)
                 self.lift()
                 self.focus_force()
             except Exception:
                 pass
-        # Margen para que los widgets CTk terminen de dibujarse con alpha 0
-        app.after(45, _revelar)
+        if self._dmt_dibujada:
+            app.after(45, _revelar)             # ya dibujada: aparece al instante
+        else:
+            # Primera vez: CTk dibuja todo al mostrarla. Se revela recién cuando la
+            # interfaz queda quieta (antes, a los 45 ms fijos, se veía cómo se armaba)
+            _cuando_quieta(app, _revelar)
+
+    def dmt_predibujar(self, app, _intentos=0):
+        """
+        Dibuja la ventana ya armada SIN que se vea (transparente) y la vuelve a
+        ocultar. CustomTkinter recién dibuja los widgets la primera vez que la
+        ventana aparece: armarla oculta no alcanzaba y al abrirla se veía cómo se
+        iba creando. Así la primera vez también abre al instante.
+        """
+        try:
+            if not self.winfo_exists() or self._dmt_dibujada or self.dmt_visible():
+                return
+        except Exception:
+            return
+        if self._dmt_ocupada():
+            if _intentos < 80:
+                app.after(15, lambda: self.dmt_predibujar(app, _intentos + 1))
+            return
+        try:
+            foco = app.focus_get()
+        except Exception:
+            foco = None
+        try:
+            self.attributes("-alpha", 0.0)
+            self.deiconify()
+        except Exception:
+            return
+
+        def _terminar():
+            self._dmt_dibujada = True
+            if self._dmt_mostrando:
+                return                          # la abrieron mientras tanto: queda a la vista
+            try:
+                self.withdraw()
+            except Exception:
+                pass
+            try:
+                if foco is not None and foco.winfo_exists():
+                    foco.focus_set()            # el foco vuelve a donde estaba
+            except Exception:
+                pass
+        _cuando_quieta(app, _terminar)
 
     def dmt_ocultar(self):
+        self._dmt_mostrando = False
         try:
             self.withdraw()
         except Exception:
@@ -5981,6 +7564,309 @@ class VentanaSecundaria(ctk.CTkToplevel):
             return bool(self.winfo_exists()) and self.state() != "withdrawn"
         except Exception:
             return False
+
+
+# ==============================================================================
+#   LISTA PARA MARCAR (ventanas de pistas de audio y subtítulos)
+# ------------------------------------------------------------------------------
+#   Antes cada fila era un CTkCheckBox: un lienzo propio por fila que CTk dibuja
+#   por separado. Con muchas filas la ventana se armaba a pedazos al abrir y, al
+#   deslizar, los textos se desacomodaban un momento. Aquí TODA la lista es un
+#   solo lienzo de Tk (las casillas son imágenes suavizadas): abre ya dibujada y
+#   se desliza liso con cualquier cantidad de filas.
+# ==============================================================================
+_LISTA_IMAGENES = {}
+
+
+def _color_mezcla(c1, c2, t):
+    """Mezcla de dos colores '#rrggbb' (t=0 -> c1, t=1 -> c2)."""
+    a = [int(c1[i:i + 2], 16) for i in (1, 3, 5)]
+    b = [int(c2[i:i + 2], 16) for i in (1, 3, 5)]
+    return "#" + "".join(f"{round(x + (y - x) * t):02x}" for x, y in zip(a, b))
+
+
+def _lista_imagen(tipo, estado, color, lado):
+    """
+    Casilla ('caja') o círculo ('radio') de ListaMarcable, dibujado 4 veces más
+    grande y reducido (bordes suaves). estado: 'no', 'no_hover', 'si', 'si_hover',
+    'off' u 'off_si' (deshabilitada). Se guardan para no volver a dibujarlos.
+    """
+    clave = (tipo, estado, color, lado)
+    img = _LISTA_IMAGENES.get(clave)
+    if img is not None:
+        return img
+    from PIL import ImageDraw
+    k = 4
+    L = max(8, lado) * k
+    im = Image.new("RGBA", (L, L), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    b = max(2 * k, round(L * 0.13))
+    marcada = estado in ("si", "si_hover", "off_si")
+    if estado.startswith("off"):
+        tinta = "#5a5a5a"
+    elif marcada:
+        tinta = _color_mezcla(color, "#ffffff", 0.18) if estado == "si_hover" else color
+    else:
+        tinta = "#c4c9cc" if estado == "no_hover" else "#949a9f"
+    if tipo == "caja":
+        r = round(L * 0.24)
+        if marcada:
+            d.rounded_rectangle((0, 0, L - 1, L - 1), radius=r, fill=tinta)
+            grosor = max(2 * k, round(L * 0.12))
+            tilde = "#a0a0a0" if estado == "off_si" else "#ffffff"
+            puntos = [(L * 0.26, L * 0.53), (L * 0.43, L * 0.69), (L * 0.75, L * 0.33)]
+            d.line(puntos, fill=tilde, width=grosor, joint="curve")
+            for x, y in (puntos[0], puntos[-1]):
+                d.ellipse((x - grosor / 2, y - grosor / 2, x + grosor / 2, y + grosor / 2), fill=tilde)
+        else:
+            d.rounded_rectangle((b / 2, b / 2, L - 1 - b / 2, L - 1 - b / 2), radius=r, outline=tinta, width=b)
+    else:
+        if marcada:
+            anillo = round(L * 0.30)
+            d.ellipse((anillo / 2, anillo / 2, L - 1 - anillo / 2, L - 1 - anillo / 2), outline=tinta, width=anillo)
+        else:
+            d.ellipse((b / 2, b / 2, L - 1 - b / 2, L - 1 - b / 2), outline=tinta, width=b)
+    im = im.resize((max(8, lado), max(8, lado)), Image.Resampling.LANCZOS)
+    img = ImageTk.PhotoImage(im)
+    _LISTA_IMAGENES[clave] = img
+    return img
+
+
+class ListaMarcable(ctk.CTkFrame):
+    """
+    Lista de opciones para marcar (casillas) o para elegir una (círculos).
+    filas: [(texto, valor, marcada)] o [(texto, valor, marcada, habilitada)];
+    (texto, None, None) es el título de un grupo (no se marca).
+    al_cambiar(): se llama cada vez que cambia lo marcado.
+    """
+    ALTO_FILA = 30
+    ALTO_TITULO = 26
+
+    def __init__(self, master, filas, multiple=True, color="#1f6aa5", filas_visibles=9,
+                 al_cambiar=None, fondo="#242424"):
+        super().__init__(master, fg_color=fondo, corner_radius=8)
+        try:
+            e = float(ctk.ScalingTracker.get_widget_scaling(self))
+        except Exception:
+            e = 1.0
+        self._multiple = bool(multiple)
+        self._color = color
+        self._al_cambiar = al_cambiar
+        self._alto_fila = int(round(self.ALTO_FILA * e))
+        self._pad = int(round(12 * e))
+        self._lado = int(round(19 * e))
+        try:
+            familia = ctk.CTkFont().cget("family")
+        except Exception:
+            familia = "Arial"
+        self._fuente = tkfont.Font(self, family=familia, size=-max(9, int(round(13 * e))))
+        self._fuente_titulo = tkfont.Font(self, family=familia, size=-max(8, int(round(11 * e))),
+                                          weight="bold")
+        hay_grupos = any(f[1] is None and f[2] is None for f in filas)
+        self._x_caja = self._pad + (int(round(6 * e)) if hay_grupos else 0)
+        self._x_texto = self._x_caja + self._lado + int(round(10 * e))
+        self._filas = []
+        y = int(round(4 * e))
+        for fila in filas:
+            texto, valor, marcada = fila[0], fila[1], fila[2]
+            titulo = valor is None and marcada is None
+            alto = int(round(self.ALTO_TITULO * e)) if titulo else self._alto_fila
+            self._filas.append({"texto": str(texto), "valor": valor, "marcada": bool(marcada) and not titulo,
+                                "titulo": titulo, "habilitada": (len(fila) < 4 or bool(fila[3])) and not titulo,
+                                "y": y, "alto": alto})
+            y += alto
+        self._alto_total = y + int(round(4 * e))
+        if not self._multiple:                       # elegir una: exactamente una marcada
+            elegibles = [f for f in self._filas if f["habilitada"]]
+            marcadas = [f for f in elegibles if f["marcada"]]
+            for f in marcadas[1:]:
+                f["marcada"] = False
+            if not marcadas and elegibles:
+                elegibles[0]["marcada"] = True
+        margen = int(round(5 * e))
+        alto_visible = min(self._alto_total, filas_visibles * self._alto_fila + int(round(8 * e)))
+        self._lienzo = tk.Canvas(self, bg=fondo, highlightthickness=0, bd=0, height=alto_visible,
+                                 yscrollincrement=max(1, self._alto_fila // 2))
+        self._barra = ctk.CTkScrollbar(self, command=self._lienzo.yview)
+        self._lienzo.configure(yscrollcommand=self._barra.set)
+        self._lienzo.pack(side="left", fill="both", expand=True, padx=(margen, margen), pady=margen)
+        self._con_barra = False
+        self._ancho = 0
+        self._hover = None
+        self._rueda_acum = 0
+        self._dibujar()
+        self._lienzo.bind("<Configure>", self._al_redimensionar)
+        self._lienzo.bind("<Motion>", self._al_mover)
+        self._lienzo.bind("<Leave>", lambda _e: self._poner_hover(None))
+        self._lienzo.bind("<Button-1>", self._al_clic)
+        try:
+            # La rueda llega a la ventana (al widget con el foco o al de debajo, según Windows)
+            self.winfo_toplevel().bind("<MouseWheel>", self._al_rueda, add="+")
+        except Exception:
+            pass
+
+    # --- dibujo ---
+    def _imagen(self, i):
+        f = self._filas[i]
+        if not f["habilitada"]:
+            estado = "off_si" if f["marcada"] else "off"
+        else:
+            estado = ("si" if f["marcada"] else "no") + ("_hover" if i == self._hover else "")
+        return _lista_imagen("caja" if self._multiple else "radio", estado, self._color, self._lado)
+
+    def _dibujar(self):
+        c = self._lienzo
+        c.delete("all")
+        self._id_hover = c.create_rectangle(0, 0, 0, 0, fill="#2f2f2f", outline="", state="hidden")
+        for i, f in enumerate(self._filas):
+            medio = f["y"] + f["alto"] // 2
+            if f["titulo"]:
+                f["id_txt"] = c.create_text(self._pad, medio + 2, text=f["texto"], anchor="w",
+                                            font=self._fuente_titulo, fill="#9a9a9a")
+                continue
+            f["id_img"] = c.create_image(self._x_caja, medio, image=self._imagen(i), anchor="w")
+            f["id_txt"] = c.create_text(self._x_texto, medio, text=f["texto"], anchor="w", font=self._fuente,
+                                        fill="#dcdcdc" if f["habilitada"] else "#6a6a6a")
+        c.configure(scrollregion=(0, 0, 1, self._alto_total))
+
+    @staticmethod
+    def _recortar(texto, fuente, ancho):
+        if ancho <= 0 or fuente.measure(texto) <= ancho:
+            return texto
+        lo, hi = 0, len(texto)
+        while lo < hi:
+            medio = (lo + hi + 1) // 2
+            if fuente.measure(texto[:medio].rstrip() + "…") <= ancho:
+                lo = medio
+            else:
+                hi = medio - 1
+        return texto[:lo].rstrip() + "…"
+
+    def _al_redimensionar(self, event):
+        if event.width == self._ancho:
+            return
+        self._ancho = event.width
+        for f in self._filas:
+            if f["titulo"]:
+                texto = self._recortar(f["texto"], self._fuente_titulo, self._ancho - 2 * self._pad)
+            else:
+                texto = self._recortar(f["texto"], self._fuente, self._ancho - self._x_texto - self._pad)
+            self._lienzo.itemconfigure(f["id_txt"], text=texto)
+        self._acomodar_barra(event.height)
+        if self._hover is not None:
+            self._poner_hover(self._hover, forzar=True)
+
+    def _acomodar_barra(self, alto):
+        sobra = self._alto_total > alto + 1
+        if sobra and not self._con_barra:
+            self._barra.pack(side="right", fill="y", pady=4, before=self._lienzo)
+            self._con_barra = True
+        elif not sobra and self._con_barra:
+            self._barra.pack_forget()
+            self._lienzo.yview_moveto(0)
+            self._con_barra = False
+
+    # --- ratón ---
+    def _fila_en(self, y):
+        for i, f in enumerate(self._filas):
+            if f["y"] <= y < f["y"] + f["alto"]:
+                return i
+        return None
+
+    def _poner_hover(self, i, forzar=False):
+        if i == self._hover and not forzar:
+            return
+        viejo, self._hover = self._hover, i
+        c = self._lienzo
+        for j in (viejo, i):
+            if j is not None and not self._filas[j]["titulo"]:
+                c.itemconfigure(self._filas[j]["id_img"], image=self._imagen(j))
+        if i is None or not self._filas[i]["habilitada"]:
+            c.itemconfigure(self._id_hover, state="hidden")
+            c.configure(cursor="")
+            return
+        f = self._filas[i]
+        c.coords(self._id_hover, 2, f["y"] + 1, max(2, self._ancho - 2), f["y"] + f["alto"] - 1)
+        c.itemconfigure(self._id_hover, state="normal")
+        c.configure(cursor="hand2")
+
+    def _al_mover(self, event):
+        self._poner_hover(self._fila_en(self._lienzo.canvasy(event.y)))
+
+    def _al_clic(self, event):
+        i = self._fila_en(self._lienzo.canvasy(event.y))
+        if i is None or not self._filas[i]["habilitada"]:
+            return
+        f = self._filas[i]
+        if self._multiple:
+            f["marcada"] = not f["marcada"]
+            self._refrescar(i)
+        elif not f["marcada"]:
+            for j, g in enumerate(self._filas):
+                if g["marcada"]:
+                    g["marcada"] = False
+                    self._refrescar(j)
+            f["marcada"] = True
+            self._refrescar(i)
+        else:
+            return
+        self._avisar()
+
+    def _al_rueda(self, event):
+        try:
+            if self.winfo_containing(event.x_root, event.y_root) is not self._lienzo:
+                return
+        except Exception:
+            return
+        if not self._con_barra:
+            return
+        self._rueda_acum += event.delta
+        pasos = int(self._rueda_acum / 120)
+        if pasos:
+            self._rueda_acum -= pasos * 120
+            self._lienzo.yview_scroll(-pasos * 3, "units")
+            self._al_mover(event)
+        return "break"
+
+    def _refrescar(self, i):
+        f = self._filas[i]
+        if not f["titulo"]:
+            self._lienzo.itemconfigure(f["id_img"], image=self._imagen(i))
+
+    def _avisar(self):
+        if self._al_cambiar:
+            try:
+                self._al_cambiar()
+            except Exception:
+                pass
+
+    # --- para quien usa la lista ---
+    def valores(self):
+        """Lo marcado (o lo elegido, si es de elegir una), en el orden de la lista."""
+        return [f["valor"] for f in self._filas if f["marcada"] and f["habilitada"]]
+
+    def marcar(self, criterio):
+        """
+        Marca las filas cuyo valor cumple criterio(valor) y desmarca las demás.
+        Si es de elegir una, elige la primera que lo cumpla (si ninguna, no cambia).
+        """
+        if not self._multiple:
+            i = next((i for i, f in enumerate(self._filas) if f["habilitada"] and criterio(f["valor"])), None)
+            if i is None:
+                return
+            for j, f in enumerate(self._filas):
+                if f["habilitada"] and f["marcada"] != (j == i):
+                    f["marcada"] = j == i
+                    self._refrescar(j)
+        else:
+            for j, f in enumerate(self._filas):
+                if not f["habilitada"]:
+                    continue
+                nueva = bool(criterio(f["valor"]))
+                if nueva != f["marcada"]:
+                    f["marcada"] = nueva
+                    self._refrescar(j)
+        self._avisar()
 
 
 class App(ctk.CTk, TkinterDnD.DnDWrapper):
@@ -6274,10 +8160,17 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
         self._auto_center_ids.append(self.after(100, self.center_window))
 
         # --- TIER-2: cargar librerías pesadas en background (no bloquea UI) ---
-        threading.Thread(target=_cargar_tier2_background, daemon=True).start()
+        # (normalmente ya arrancó al terminar el splash; si no, arranca aquí)
+        _iniciar_tier2()
+
+        # --- ACTIVIDAD DEL USUARIO: el Prebuild se pausa mientras se usa la app ---
+        self._t_arranque = time.monotonic()
+        self._ultima_actividad = 0.0
+        for _evento in ("<ButtonPress>", "<KeyPress>", "<MouseWheel>", "<Motion>"):
+            self.bind_all(_evento, self._marcar_actividad, add="+")
 
         # --- LAZY FRAMES: pre-construir el resto de frames en background (2s de delay) ---
-        self.after(2000, self._prebuild_frames_en_background)
+        self.after(1500, self._prebuild_frames_en_background)
        
 
 
@@ -6490,6 +8383,21 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
 
         threading.Thread(target=_medir, name="dmt_ffmpeg_caps", daemon=True).start()
 
+    def _marcar_actividad(self, _evento=None):
+        self._ultima_actividad = time.monotonic()
+
+    def _usuario_activo(self, margen=0.8):
+        """True si hubo un clic, tecla, rueda o movimiento del mouse en los últimos 'margen' segundos."""
+        return time.monotonic() - getattr(self, "_ultima_actividad", 0.0) < margen
+
+    def _prebuild_debe_esperar(self, margen):
+        """True si conviene posponer el siguiente paso del Prebuild."""
+        if self._usuario_activo(margen):
+            return True
+        # Tier-2 cargando: se espera (como mucho 12 s desde el arranque)
+        return (not _tier2_listo.is_set()
+                and time.monotonic() - getattr(self, "_t_arranque", 0.0) < 12)
+
     def _prebuild_frames_en_background(self):
         """
         Construye los frames que aún no se han visitado, uno por uno,
@@ -6508,6 +8416,12 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
                 print("[Prebuild] ✅ Todos los frames construidos.")
                 self.after(400, self._prebuild_ventanas_estaticas)
                 return
+            # Armar un módulo congela la interfaz unos cientos de ms: se espera a
+            # que no estés haciendo clic / escribiendo, y a que Tier-2 termine
+            # (mientras carga compite por el procesador y todo va hasta 3x más lento)
+            if self._prebuild_debe_esperar(0.8):
+                self.after(250, lambda: _build_next(idx))
+                return
             name = to_build[idx]
             if name not in self.frames:
                 builder = self._frame_builders.get(name)
@@ -6519,6 +8433,44 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
             self.after(80, lambda: _build_next(idx + 1))
 
         _build_next(0)
+
+    def _prebuild_ventanas_estaticas(self):
+        """
+        Construye ocultas las ventanas de contenido fijo (Acerca de, Licencias,
+        Documentación, Guía de modelos, Formatos soportados y la ⚙️ Configuración
+        de descargas) para que abran al instante, sin verse cómo se arman. Solo
+        con la app quieta y una por tanda, para no trabar la interfaz.
+        """
+        tareas = [
+            ("toplevel_about", lambda: self.open_about_window(mostrar=False)),
+            ("toplevel_licenses", lambda: self.open_licenses_window(mostrar=False)),
+            ("toplevel_docs", lambda: self.open_docs_window(mostrar=False)),
+            ("toplevel_model_help", lambda: self.open_model_help(mostrar=False)),
+            ("toplevel_meta_info", lambda: self.meta_show_info_window(mostrar=False)),
+            ("_yt_win_config", lambda: (self._yt_abrir_configuracion(mostrar=False)
+                                        if hasattr(self, "yt_codec_var") else None)),
+        ]
+
+        def _siguiente(i):
+            if i >= len(tareas):
+                print("[Prebuild] ✅ Ventanas secundarias listas.")
+                return
+            # Se abren poco: solo se arman cuando llevas un rato sin tocar nada
+            if self._prebuild_debe_esperar(1.5):
+                self.after(400, lambda: _siguiente(i))
+                return
+            attr, fn = tareas[i]
+            try:
+                if getattr(self, attr, None) is None:
+                    fn()
+                win = getattr(self, attr, None)
+                if win is not None and hasattr(win, "dmt_predibujar"):
+                    win.dmt_predibujar(self)    # que la primera vez también abra ya dibujada
+            except Exception as e:
+                print(f"[Prebuild] Ventana {attr}: {e}")
+            self.after(450, lambda: _siguiente(i + 1))
+
+        _siguiente(0)
 
     # ==========================================================================
     #   VENTANAS SECUNDARIAS (helpers comunes)
@@ -6595,34 +8547,6 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
                 pass
         self._ventana_mostrar(win)
         return True
-
-    def _prebuild_ventanas_estaticas(self):
-        """
-        Construye ocultas las ventanas de contenido fijo (Acerca de, Licencias,
-        Documentación, Guía de modelos, Formatos soportados) para que abran al
-        instante desde la primera vez. Una por tanda para no trabar la interfaz.
-        """
-        tareas = [
-            ("toplevel_about", lambda: self.open_about_window(mostrar=False)),
-            ("toplevel_licenses", lambda: self.open_licenses_window(mostrar=False)),
-            ("toplevel_docs", lambda: self.open_docs_window(mostrar=False)),
-            ("toplevel_model_help", lambda: self.open_model_help(mostrar=False)),
-            ("toplevel_meta_info", lambda: self.meta_show_info_window(mostrar=False)),
-        ]
-
-        def _siguiente(i):
-            if i >= len(tareas):
-                print("[Prebuild] ✅ Ventanas secundarias listas.")
-                return
-            attr, fn = tareas[i]
-            try:
-                if getattr(self, attr, None) is None:
-                    fn()
-            except Exception as e:
-                print(f"[Prebuild] Ventana {attr}: {e}")
-            self.after(120, lambda: _siguiente(i + 1))
-
-        _siguiente(0)
 
     # ==========================================================================
     #   HILOS E INTERFAZ: todo cambio de widgets pasa por el hilo de la interfaz
@@ -6729,6 +8653,96 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
         with self.gestor_ia.en_uso(nombre):
             return fn(*args)
 
+    # --- Botón "Liberar modelo IA" (menú, Transcripción, OCR y Quitar fondo) ---
+    _TEXTO_LIBERAR_IA = "🧹 Liberar modelo IA"
+
+    def _boton_liberar_ia(self, parent, alto=None, ancho=215):
+        """
+        Botón que saca de memoria el modelo de IA cargado, sea cual sea. Ancho fijo
+        y textos cortos: al cambiar de texto ya no se estira ni mueve lo de al lado.
+        """
+        extra = {"height": alto} if alto else {}
+        btn = ctk.CTkButton(parent, text=self._TEXTO_LIBERAR_IA, width=ancho,
+                            fg_color="transparent", border_width=1, border_color="#555",
+                            hover_color="#333", text_color_disabled="#c8c8c8",
+                            command=self._liberar_modelos_ia, **extra)
+        if not hasattr(self, "_btns_liberar_ia"):
+            self._btns_liberar_ia = []
+        self._btns_liberar_ia.append(btn)
+        # Si se crea mientras otro botón muestra un aviso, arranca igual que los demás
+        texto, activo = getattr(self, "_liberar_ia_estado", (self._TEXTO_LIBERAR_IA, True))
+        if not activo:
+            btn.configure(text=texto, state="disabled")
+        return btn
+
+    def _liberar_ia_mostrar(self, texto, restaurar_ms=None, activo=False):
+        """
+        Mismo texto en todos los botones. Mientras muestra un aviso el botón queda
+        desactivado: los clics repetidos ya no hacen parpadear ni encimar textos.
+        restaurar_ms: vuelve al estado normal pasado ese tiempo.
+        """
+        self._liberar_ia_estado = (texto, activo)
+        for b in getattr(self, "_btns_liberar_ia", []):
+            try:
+                b.configure(text=texto, state="normal" if activo else "disabled")
+            except Exception:
+                pass
+        gen = self._liberar_ia_gen = getattr(self, "_liberar_ia_gen", 0) + 1
+        if restaurar_ms:
+            self.after(restaurar_ms, lambda: gen == self._liberar_ia_gen
+                       and self._liberar_ia_mostrar(self._TEXTO_LIBERAR_IA, activo=True))
+
+    def _liberar_modelos_ia(self):
+        """
+        Libera el modelo de IA que esté en memoria (Whisper, OCR o Quitar fondo).
+        Si alguno está trabajando (o hay otro esperando turno) se libera cuando
+        termine el último; si no, al momento. Corre en un hilo: cerrar el motor
+        de OCR o vaciar la VRAM puede tardar un par de segundos.
+        """
+        hilo = getattr(self, "_liberar_ia_hilo", None)
+        if hilo is not None and hilo.is_alive():
+            return
+        if not getattr(self, "_liberar_ia_estado", (None, True))[1]:
+            return                      # ya hay un aviso en pantalla
+
+        def _trabajo():
+            try:
+                res = self.gestor_ia.liberar_todo_al_terminar(self.carril_ia.hay_en_espera)
+                # Whisper en memoria sin marcar como cargado: también se libera
+                if res == "nada" and getattr(self, "faster_model", None) is not None:
+                    self.descargar_modelo_whisper()
+                    res = "ahora"
+            except Exception as e:
+                print(f"[Modelos IA] No se pudo liberar: {e}")
+                res = "error"
+            self._en_ui(self._liberar_ia_resultado, res)
+
+        self._liberar_ia_mostrar("⏳ Liberando…")
+        self._liberar_ia_hilo = threading.Thread(target=_trabajo, name="dmt_liberar_ia",
+                                                 daemon=True)
+        self._liberar_ia_hilo.start()
+
+    def _liberar_ia_resultado(self, res):
+        if res == "al_terminar":
+            self._liberar_ia_mostrar("⏳ Se libera al terminar")
+            if not getattr(self, "_liberar_ia_vigilando", False):
+                self._liberar_ia_vigilando = True
+                self.after(1000, self._liberar_ia_vigilar)
+        elif res == "ahora":
+            self._liberar_ia_mostrar("✅ Modelo liberado", 2200)
+        elif res == "nada":
+            self._liberar_ia_mostrar("ℹ️ No hay modelo cargado", 2200)
+        else:
+            self._liberar_ia_mostrar("❌ No se pudo liberar", 2200)
+
+    def _liberar_ia_vigilar(self):
+        """Mientras la liberación espera a que termine un trabajo, avisa cuando ocurre."""
+        if self.gestor_ia.liberacion_pendiente():
+            self.after(1000, self._liberar_ia_vigilar)
+            return
+        self._liberar_ia_vigilando = False
+        self._liberar_ia_mostrar("✅ Modelo liberado", 2200)
+
     def force_window_icon(self, window):
         """
         Fuerza el icono en ventanas secundarias (Toplevel).
@@ -6743,12 +8757,15 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
 
             # 2. Intentar poner el .png (Para compatibilidad visual extra)
             try:
+                # Se decodifica y reduce UNA vez (antes, dos veces por cada ventana nueva)
+                photo = getattr(self, "_icono_ventana_32", None)
                 target = self.app_logo_png_path if os.path.exists(self.app_logo_png_path) else self.app_icon_path
-                if os.path.exists(target):
+                if photo is None and os.path.exists(target):
                     img = Image.open(target).convert("RGBA")
                     # Tamaño estándar para iconos de ventana
                     img = img.resize((32, 32), Image.Resampling.LANCZOS)
-                    photo = ImageTk.PhotoImage(img)
+                    photo = self._icono_ventana_32 = ImageTk.PhotoImage(img)
+                if photo is not None:
                     
                     # wm_iconphoto(False, ...) aplica el icono SOLO a esta ventana
                     window.wm_iconphoto(False, photo)
@@ -7556,6 +9573,9 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
         # Arrancar el watcher que re-habilita los botones cuando Tier-2 está listo
         self.after(500, self._watch_tier2_ready)
 
+        # Liberar el modelo de IA cargado (el mismo botón que en Transcripción, OCR y Quitar fondo)
+        self._boton_liberar_ia(glass_panel).place(relx=1.0, x=-22, y=18, anchor="ne")
+
     def _watch_tier2_ready(self):
         """Polling ligero: re-habilita los botones pesados cuando _tier2_listo se activa."""
         if _tier2_listo.is_set():
@@ -7978,6 +9998,68 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
             # Repetir cada 1 segundo
             self.after(1000, self.update_batch_timer)
     
+    def _img_ruta_unica(self, ruta):
+        """Nombre de salida libre; con el lote en paralelo, tampoco uno que eligió otro hilo."""
+        reservadas = getattr(self, "_img_reservadas", None)
+        if reservadas is None:
+            return _ruta_unica(ruta)
+        return _ruta_unica_reservando(ruta, reservadas, self._img_reservadas_lock)
+
+    def _imagenes_en_paralelo(self, lote, cola, report, progress_bar, counter_lbl, status_lbl):
+        """
+        Convertir / comprimir imágenes: 2 o 3 a la vez según los núcleos del
+        equipo (antes, de a una). CANCELAR deja terminar las que ya empezaron y
+        no arranca las demás. El resumen queda en el orden de la lista.
+        """
+        total = len(cola)
+        hilos = min(total, 3 if (os.cpu_count() or 2) >= 6 else 2)
+        resultados = [None] * total
+        hechos = [0]
+        candado = threading.Lock()
+        self._img_reservadas = set()
+        self._img_reservadas_lock = threading.Lock()
+        self._img_paralelo = True
+
+        def _una(i, path):
+            self._lote_hilo.actual = lote       # CANCELAR / estado de ESTE lote en este hilo
+            try:
+                if lote.cortar:
+                    return i, None
+                try:
+                    return i, self.convert_image_logic(path)
+                except Exception as e:
+                    return i, (False, f"Excepción Crítica: {str(e)}")
+            finally:
+                self._lote_hilo.actual = None
+                with candado:
+                    hechos[0] += 1
+                    n = hechos[0]
+                self._en_ui(progress_bar.set, n / total)
+                self._en_ui(counter_lbl.configure, text=f"{n}/{total}  —  {hilos} a la vez")
+
+        self._en_ui(status_lbl.configure, text=f"Procesando {hilos} imágenes a la vez…",
+                    text_color="white")
+        try:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=hilos,
+                                                       thread_name_prefix="dmt_img") as pool:
+                for fut in concurrent.futures.as_completed(
+                        [pool.submit(_una, i, p) for i, p in enumerate(cola)]):
+                    i, r = fut.result()
+                    resultados[i] = r
+        finally:
+            self._img_paralelo = False
+            self._img_reservadas = None
+
+        for path, r in zip(cola, resultados):
+            name = os.path.basename(path)
+            if r is None:
+                report.append(f"{name}: ⏹ CANCELADO (no se procesó)")
+            elif r[0]:
+                report.append(f"{name}: ✅ OK")
+            else:
+                report.append(f"{name}: ❌ {r[1]}")
+                print(f"Error en {name}: {r[1]}")
+
     def run_batch_process(self, lote=None):
         lote = lote or self._lote()
         modo = lote.modo
@@ -8027,8 +10109,14 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
                         self.timer_running = True
                         self._en_ui(self.update_batch_timer)
 
+                    # Imágenes: varias a la vez (cada una es un FFmpeg / Pillow aparte)
+                    en_paralelo = modo == "image" and total > 1
+                    if en_paralelo:
+                        self._imagenes_en_paralelo(lote, cola, report, progress_bar,
+                                                   counter_lbl, status_lbl)
+
                     # 4. Iterar archivos
-                    for i, path in enumerate(cola):
+                    for i, path in enumerate([] if en_paralelo else cola):
                         if lote.cortar:
                             # CANCELAR: el archivo anterior ya terminó; el resto no se procesa
                             for resto in cola[i:]:
@@ -8107,6 +10195,8 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
                                 report.append(f"{name}: ✅ {detalle}")
                             else:
                                 report.append(f"{name}: ✅ OK")
+                        elif str(msg).startswith("⏭"):
+                            report.append(f"{name}: {msg}")     # omitido a propósito, no es un error
                         else:
                             report.append(f"{name}: ❌ {msg}")
                             print(f"Error en {name}: {msg}")
@@ -8585,16 +10675,27 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
     #   VIDEO: armado de comandos (rutas GPU / mixta / CPU con reintento)
     # ------------------------------------------------------------------
     @staticmethod
-    def _vid_audio_args(ext, info, modo, keep_audio=True):
-        """Audio lo más fiel posible: se COPIA cuando el contenedor lo acepta."""
+    def _vid_audio_args(ext, info, modo, keep_audio=True, pistas=None):
+        """
+        Audio lo más fiel posible: se COPIA cuando el contenedor lo acepta.
+        pistas: índices de las pistas de audio que van al archivo cuando tiene
+        varias; solo se copia si TODAS se pueden copiar.
+        """
         ac = info.get("acodec")
         if not ac:
             return []                                   # el archivo no trae audio
+        audios = info.get("audios") or []
+        if pistas and audios:
+            elegidas = [audios[i] for i in pistas if 0 <= i < len(audios)] or audios[:1]
+        else:
+            elegidas = [{"codec": ac, "abr": info.get("abr")}]
+        codecs = {a.get("codec") for a in elegidas}
+        abr = elegidas[0].get("abr")
         if modo == "compress":
             if not keep_audio:
                 return ["-an"]
-            abr = info.get("abr")
-            if ac == "aac" and (abr is None or abr <= 200_000):
+            if codecs == {"aac"} and all(a.get("abr") is None or a.get("abr") <= 200_000
+                                         for a in elegidas):
                 return ["-c:a", "copy"]                 # ya es AAC ligero: no se recodifica
             return ["-c:a", "aac", "-b:a", "192k"]
         # Convertir (fiel)
@@ -8604,20 +10705,98 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
             copiables = {"aac", "mp3", "ac3", "eac3", "alac"}
             if ext == "mov":
                 copiables |= {"pcm_s16le", "pcm_s24le"}
-            if ac in copiables:
+            if codecs <= copiables:
                 return ["-c:a", "copy"]
-            kbps = (info.get("abr") or 320_000) / 1000
+            kbps = (abr or 320_000) / 1000
             br = "192k" if kbps <= 192 else ("256k" if kbps <= 256 else "320k")
             return ["-c:a", "aac", "-b:a", br]
         if ext == "avi":
-            if ac in ("mp3", "ac3", "pcm_s16le"):
+            if codecs <= {"mp3", "ac3", "pcm_s16le"}:
                 return ["-c:a", "copy"]
             return ["-c:a", "libmp3lame", "-q:a", "0"]
         if ext == "wmv":
-            if ac in ("wmav2", "wmav1"):
+            if codecs <= {"wmav2", "wmav1"}:
                 return ["-c:a", "copy"]
             return ["-c:a", "wmav2", "-b:a", "192k"]
         return ["-c:a", "aac", "-b:a", "192k"]
+
+    # Subtítulos de texto (sin -map, FFmpeg pasa el primero solo a MKV; a MP4/MOV ninguno)
+    _VID_SUBS_TEXTO = {"subrip", "srt", "ass", "ssa", "mov_text", "webvtt", "text"}
+    # De imagen: solo caben en MKV
+    _VID_SUBS_IMAGEN = {"hdmv_pgs_subtitle", "dvd_subtitle", "dvb_subtitle"}
+
+    @classmethod
+    def _vid_mapas(cls, info, pistas, ext, subs=None):
+        """
+        -map para quedarse con las pistas de audio elegidas (sin -map, FFmpeg deja
+        solo una) y con los subtítulos elegidos. subs=None: como FFmpeg lo elegiría
+        solo (en MKV, el primer subtítulo de texto; a MP4/MOV ninguno).
+        """
+        mapas = ["-map", "0:V:0?"]
+        for i in pistas or []:
+            mapas += ["-map", f"0:a:{i}"]
+        if subs is None:
+            if ext == "mkv":
+                k = next((j for j, c in enumerate(info.get("subs") or []) if c in cls._VID_SUBS_TEXTO), None)
+                if k is not None:
+                    mapas += ["-map", f"0:s:{k}"]
+        else:
+            for k in subs:
+                mapas += ["-map", f"0:s:{k}"]
+            if subs and ext == "mkv":
+                mapas += ["-map", "0:t?"]          # fuentes que usan los subtítulos ASS
+        return mapas
+
+    @classmethod
+    def _vid_subs_compatibles(cls, subs, ext):
+        """Índices de los subtítulos que caben en ese formato de salida."""
+        if ext == "mkv":
+            validos = cls._VID_SUBS_TEXTO | cls._VID_SUBS_IMAGEN
+        elif ext in ("mp4", "mov"):
+            validos = cls._VID_SUBS_TEXTO
+        else:
+            return []                              # AVI / WMV no guardan subtítulos
+        return [k for k, s in enumerate(subs or []) if s.get("codec") in validos]
+
+    @staticmethod
+    def _vid_nombres_audio(info, pistas, ext):
+        """Con varias pistas en MP4/MOV, el nombre que muestra el reproductor (ahí el título no se guarda)."""
+        if ext not in ("mp4", "mov") or not pistas or len(pistas) < 2:
+            return []
+        audios = info.get("audios") or []
+        args = []
+        for n, i in enumerate(pistas):
+            a = audios[i] if 0 <= i < len(audios) else {}
+            nombre = a.get("titulo") or _idioma_nombre(a.get("idioma"))
+            if nombre and nombre != "sin idioma":
+                args += [f"-metadata:s:a:{n}", f"handler_name={nombre}"]
+        return args
+
+    @staticmethod
+    def _vid_subs_args(info, subs, ext):
+        """
+        Códec de los subtítulos elegidos: en MP4/MOV van como texto (mov_text) con
+        su nombre visible en el reproductor; en MKV, tal cual (mov_text pasa a SRT).
+        """
+        if not subs:
+            return []
+        todos = info.get("subs_info") or []
+        if ext in ("mp4", "mov"):
+            args = ["-c:s", "mov_text"]
+            for n, k in enumerate(subs):
+                s = todos[k] if k < len(todos) else {}
+                nombre = s.get("titulo") or _idioma_nombre(s.get("idioma"))
+                if not nombre or nombre == "sin idioma":
+                    nombre = f"Subtítulo {n + 1}"
+                args += [f"-metadata:s:s:{n}", f"handler_name={nombre}"]
+            return args
+        if ext == "mkv":
+            args = ["-c:s", "copy"]
+            for n, k in enumerate(subs):
+                if k < len(todos) and todos[k].get("codec") == "mov_text":
+                    args += [f"-c:s:{n}", "srt"]        # mov_text no existe en MKV
+            return args
+        return []
 
     @staticmethod
     def _vid_pix(encoder, diez):
@@ -8672,6 +10851,7 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
         elif decod == "gpu_dec":
             cmd += ["-hwaccel", "cuda"]
         cmd += ["-i", src]
+        cmd += plan.get("mapas") or []                # varias pistas de audio (ver _vid_mapas)
 
         if decod == "copia":
             cmd += ["-c:v", "copy"]
@@ -8700,6 +10880,7 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
         if es_hevc and plan["ext"] in ("mp4", "mov"):
             cmd += ["-tag:v", "hvc1"]                 # para que Apple/QuickTime lo reproduzca
         cmd += plan["audio"]
+        cmd += plan.get("subs") or []                 # subtítulos elegidos y nombres de las pistas
         if plan["ext"] in ("mp4", "mov"):
             cmd += ["-movflags", "+faststart"]
         cmd.append(out)
@@ -8819,23 +11000,54 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
                     if clave in fmt:
                         tgt_ext, a_codec, copiables = ext_t, args, cop
                         break
-                out_path = _ruta_unica(os.path.join(folder, f"{base}.{tgt_ext}"))
-                intentos = []
-                if info.get("acodec") in copiables:
-                    intentos.append((["-c:a", "copy"], "copia directa"))
-                intentos.append((a_codec, ""))
-                ultimas = []
-                for args, etiqueta in intentos:
-                    cmd = ["ffmpeg", "-y", "-hide_banner", "-nostdin", "-i", source_path,
-                           "-vn", "-sn", "-dn", *args, out_path]
-                    codigo, ultimas, _ = self._vid_ejecutar(cmd, dur, "Extrayendo", etiqueta, "#e67e22")
-                    if self.cancel_requested:
+                # Varias pistas de audio: se eligen cuáles extraer (un archivo por pista)
+                audios = info.get("audios") or []
+                pistas = [None]                 # None: la que elige FFmpeg, como siempre
+                if len(audios) >= 2:
+                    pistas = self._pistas_para(source_path, audios, "extract", multiple=True)
+                    if not pistas:
+                        return False, "⏭ Omitido (no se eligió ninguna pista de audio)"
+                varias = len(pistas) > 1
+                idiomas = [str(audios[i].get("idioma") or "").lower() if i is not None else ""
+                           for i in pistas]
+                hechas, directas, ultimas = 0, 0, []
+                for n, pista in enumerate(pistas, start=1):
+                    sufijo = ""
+                    if varias:
+                        idioma = idiomas[n - 1]
+                        sufijo = (f" [{idioma}]" if idioma and idioma != "und" and idiomas.count(idioma) == 1
+                                  else f" [pista {pista + 1}]")
+                    out_path = _ruta_unica(os.path.join(folder, f"{base}{sufijo}.{tgt_ext}"))
+                    codec_src = info.get("acodec") if pista is None else audios[pista].get("codec")
+                    mapa = [] if pista is None else ["-map", f"0:a:{pista}"]
+                    intentos = []
+                    if codec_src in copiables:
+                        intentos.append((["-c:a", "copy"], "copia directa"))
+                    intentos.append((a_codec, ""))
+                    for args, etiqueta in intentos:
+                        cmd = ["ffmpeg", "-y", "-hide_banner", "-nostdin", "-i", source_path, *mapa,
+                               "-vn", "-sn", "-dn", *args, out_path]
+                        rotulo = " · ".join(x for x in ((f"pista {n}/{len(pistas)}" if varias else ""),
+                                                        etiqueta) if x)
+                        codigo, ultimas, _ = self._vid_ejecutar(cmd, dur, "Extrayendo", rotulo, "#e67e22")
+                        if self.cancel_requested:
+                            _borrar_salida()
+                            return False, "CANCELADO"
+                        if codigo == 0:
+                            hechas += 1
+                            directas += bool(etiqueta)
+                            break
                         _borrar_salida()
-                        return False, "CANCELADO"
-                    if codigo == 0:
-                        _estado("✅ Finalizado", "#2cc985")
-                        return True, "Audio: copia directa" if etiqueta else "Audio extraído"
-                    _borrar_salida()
+                if hechas == len(pistas):
+                    _estado("✅ Finalizado", "#2cc985")
+                    if varias:
+                        return True, (f"{hechas} pistas de audio extraídas"
+                                      + (" (copia directa)" if directas == hechas else ""))
+                    return True, "Audio: copia directa" if directas else "Audio extraído"
+                if hechas:
+                    _estado("⚠️ Terminado con errores", "orange")
+                    return True, (f"{hechas}/{len(pistas)} pistas extraídas "
+                                  f"(error: {self._vid_linea_error(ultimas)[:40]})")
                 _estado("❌ Error", "red")
                 return False, f"ERROR: {self._vid_linea_error(ultimas)[:60]}"
 
@@ -8884,12 +11096,35 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
                                    else ("slow" if idx >= 3 else "medium")}
 
             dims = vid_dims_objetivo(info, corto) if info.get("ok") else None
+            # Pistas de audio y subtítulos: si hay algo que elegir (varias pistas de
+            # audio o subtítulos que quepan en el formato de salida) se pregunta.
+            # Convertir marca todo de entrada; reducir tamaño, solo el audio
+            # principal y sin subtítulos (pesa menos), pero siempre deja marcar más.
+            audios = info.get("audios") or []
+            subs = info.get("subs_info") or []
+            conservar_audio = (bool(self.v_comp_audio.get())
+                               if self.video_submode == "compress" else True)
+            principal = next((i for i, a in enumerate(audios) if a.get("defecto")), 0)
+            compat = self._vid_subs_compatibles(subs, ext)
+            elegir_audio = audios if (len(audios) >= 2 and conservar_audio) else []
+            pistas_audio, subs_elegidos = None, None
+            if elegir_audio or compat:
+                eleccion = self._pistas_subs_para(source_path, elegir_audio, subs, compat,
+                                                  self.video_submode, ext, principal)
+                if eleccion is None:
+                    return False, "⏭ Omitido (elegiste omitir este archivo)"
+                pistas_audio, subs_elegidos = eleccion["audio"], eleccion["subs"]
+                if pistas_audio is None and audios and conservar_audio:
+                    pistas_audio = [principal]      # con -map hay que decir cuál: la principal
             plan = {
                 "codec": codec, "ext": ext, "dims": dims, "q": q, "preset": preset,
                 "diez": codec in ("hevc", "av1") and (info.get("bits") or 8) >= 10,
                 "audio": self._vid_audio_args(ext, info, self.video_submode,
-                                              keep_audio=bool(self.v_comp_audio.get())
-                                              if self.video_submode == "compress" else True),
+                                              keep_audio=conservar_audio, pistas=pistas_audio),
+                "mapas": (self._vid_mapas(info, pistas_audio if conservar_audio else [], ext, subs_elegidos)
+                          if (pistas_audio or subs_elegidos is not None) else []),
+                "subs": (self._vid_subs_args(info, subs_elegidos, ext)
+                         + self._vid_nombres_audio(info, pistas_audio if conservar_audio else [], ext)),
             }
             out_path = _ruta_unica(os.path.join(folder, f"{base}{sufijo}.{ext}"))
 
@@ -8964,6 +11199,10 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
                 if codigo == 0:
                     _estado("✅ Finalizado", "#2cc985")
                     partes = [etiqueta]
+                    if pistas_audio and len(pistas_audio) > 1:
+                        partes.append(f"{len(pistas_audio)} pistas de audio")
+                    if subs_elegidos:
+                        partes.append(f"{len(subs_elegidos)} subtítulo{'s' if len(subs_elegidos) > 1 else ''}")
                     if dims and decod != "copia":
                         partes.append(f"{dims[0]}x{dims[1]}")
                     if sin_nvdec:
@@ -9330,6 +11569,7 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
             command=self._rembg_start
         )
         self.btn_run_rembg.pack(side="left", padx=10)
+        self._boton_liberar_ia(btn_box3, alto=45).pack(side="left", padx=10)
 
         # Mapeo por defecto para compatibilidad
         self.image_list_label = self.img_conv_lbl
@@ -9574,7 +11814,7 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
                 
                 # Nunca sobre un archivo existente: convertir al mismo formato en
                 # "Misma Carpeta" escribía encima del ORIGINAL (recomprimido y sin EXIF)
-                out_path = _ruta_unica(os.path.join(
+                out_path = self._img_ruta_unica(os.path.join(
                     folder, f"{os.path.splitext(os.path.basename(source_path))[0]}.{tgt_ext}"))
 
                 # ── CONVERSIÓN A ICO: método PIL (multi-tamaño, sin ffmpeg) ──────
@@ -9711,7 +11951,7 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
                     self._registrar_salida(self.img_comp_dest_seg, folder)
 
                     stem = os.path.splitext(os.path.basename(source_path))[0]
-                    out_path = _ruta_unica(os.path.join(folder, f"{stem}_mini50.{ext}"))
+                    out_path = self._img_ruta_unica(os.path.join(folder, f"{stem}_mini50.{ext}"))
 
                     pre_opts, entrada, tmps = _img_entrada_ffmpeg(
                         source_path, opaco=(ext in ("jpg", "jpeg", "bmp")), con_filtro=True)
@@ -9739,7 +11979,7 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
                     self._registrar_salida(self.img_comp_dest_seg, folder)
 
                     stem = os.path.splitext(os.path.basename(source_path))[0]
-                    out_path = _ruta_unica(os.path.join(folder, f"{stem}_mini.{ext}"))
+                    out_path = self._img_ruta_unica(os.path.join(folder, f"{stem}_mini.{ext}"))
 
                     pre_opts, entrada, tmps = _img_entrada_ffmpeg(
                         source_path, opaco=(ext == "jpg"), con_filtro=(level == "Extrema (Web/Email)"))
@@ -9773,7 +12013,8 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
             if not self._lote().cortar:
                 self._en_ui(self.image_status_label.configure, text="Procesando...", text_color="yellow")
             barra = self.img_prog_bar_comp if self.img_submode == "compress" else self.img_prog_bar_conv
-            self._en_ui(barra.set, 0.5)
+            if not getattr(self, "_img_paralelo", False):     # en paralelo la barra es del lote
+                self._en_ui(barra.set, 0.5)
 
             # encoding='utf-8' + errors='ignore': sin crasheos con tildes/ñ en la salida de FFmpeg
             res = subprocess.run(
@@ -9866,12 +12107,12 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
 
         # Detectar si modelo ya existe en disco para mostrar mensaje correcto
         if self.rembg_session is None:
-            _local = os.environ.get("LOCALAPPDATA", os.path.expanduser("~"))
-            _model_file = os.path.join(_local, "DeusMachinaTools", "rembg_models", "u2net.onnx")
-            if os.path.isfile(_model_file):
+            # rembg guarda el modelo en rembg_models\models\u2net\ (antes se buscaba
+            # solo en rembg_models\ y siempre decía "Descargando", aunque ya estuviera)
+            if _rembg_ruta_u2net():
                 _txt = "Cargando modelo de IA..."
             else:
-                _txt = "Descargando modelo de IA (176 MB)... Esto solo ocurrirá la primera vez."
+                _txt = "Conectando para descargar el modelo de IA (176 MB)... Solo ocurrirá la primera vez."
             self.rembg_status_lbl.configure(text=_txt, text_color="yellow")
             self.rembg_prog_bar.configure(mode="indeterminate")
             self.rembg_prog_bar.start()
@@ -9885,6 +12126,59 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
         self._trabajo_inicio("rembg", "Quitar fondo de imágenes")
         t = threading.Thread(target=self._rembg_worker, daemon=True)
         t.start()
+
+    def _rembg_bajar_modelo_en_paralelo(self):
+        """
+        Empieza a bajar u2net en un hilo y muestra el avance real en pantalla.
+        Devuelve ese hilo; al terminar tiene .ruta (o .error) y .reportero.
+        """
+        estado = {"hecho": 0, "total": 0}
+
+        def _bajar():
+            try:
+                hilo.ruta = _rembg_descargar_u2net(
+                    lambda h, t: estado.update(hecho=h, total=t))
+            except Exception as e:
+                hilo.error = e
+
+        hilo = threading.Thread(target=_bajar, name="dmt_u2net_descarga", daemon=True)
+        hilo.ruta, hilo.error = None, None
+        barra = {"determinada": False}
+
+        def _mostrar(texto, frac):
+            self.rembg_status_lbl.configure(text=texto, text_color="yellow")
+            if frac is None:
+                return
+            if not barra["determinada"]:
+                barra["determinada"] = True
+                self.rembg_prog_bar.stop()
+                self.rembg_prog_bar.configure(mode="determinate")
+            self.rembg_prog_bar.set(frac)
+
+        def _reportar():
+            mb = 1024 * 1024
+            ultimo = None
+            while hilo.is_alive():
+                time.sleep(0.25)
+                h, t = estado["hecho"], estado["total"]
+                if not h:
+                    continue
+                if t:
+                    pct = int(h * 100 / t)
+                    if pct == ultimo:
+                        continue
+                    ultimo = pct
+                    self._en_ui(_mostrar, f"Descargando modelo de IA: {pct}%  "
+                                          f"({h / mb:.0f} de {t / mb:.0f} MB) — solo la primera vez",
+                                h / t)
+                else:
+                    self._en_ui(_mostrar, f"Descargando modelo de IA: {h / mb:.0f} MB "
+                                          f"— solo la primera vez", None)
+
+        hilo.reportero = threading.Thread(target=_reportar, name="dmt_u2net_avance", daemon=True)
+        hilo.start()
+        hilo.reportero.start()
+        return hilo
 
     def _rembg_liberar(self):
         """Libera la sesión u2net (la llama el gestor de modelos)."""
@@ -9937,6 +12231,12 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
             os.makedirs(_models_dir, exist_ok=True)
             os.environ["U2NET_HOME"] = _models_dir
 
+            # Modelo que falta: se empieza a bajar YA, en paralelo con la carga de
+            # las librerías, mostrando el avance real
+            descarga = None
+            if self.rembg_session is None and _rembg_ruta_u2net() is None:
+                descarga = self._rembg_bajar_modelo_en_paralelo()
+
             # Monkey-patch importlib.metadata: rembg llama requires() en sus deps
             # y en el .exe no existen los dist-info → devolvemos [] silenciosamente
             import importlib.metadata as _imeta
@@ -9974,6 +12274,24 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
                     for _mod in [k for k in sys.modules if "rembg" in k]:
                         sys.modules.pop(_mod, None)
                     time.sleep(0.2)
+
+            # ── Modelo bajándose en paralelo: se espera a que termine ──────
+            if descarga is not None:
+                descarga.join()
+                descarga.reportero.join(2)
+                if descarga.error is not None:
+                    print(f"[Quitar fondo] La descarga directa del modelo falló "
+                          f"({descarga.error}); la intenta rembg por su cuenta.")
+                    _txt_carga = "Descargando modelo de IA (176 MB)... Solo ocurrirá la primera vez."
+                else:
+                    _rembg_ubicar_modelo(descarga.ruta)
+                    _txt_carga = "Cargando modelo de IA..."
+
+                def _volver_a_indeterminado(t=_txt_carga):
+                    self.rembg_status_lbl.configure(text=t, text_color="yellow")
+                    self.rembg_prog_bar.configure(mode="indeterminate")
+                    self.rembg_prog_bar.start()
+                self._en_ui(_volver_a_indeterminado)
 
             # ── Cargar sesión SOLO si no está cacheada ──────────────────────
             if self.rembg_session is None:
@@ -10715,13 +13033,20 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
             elif "4." in sel_level:                           # 4. Extrema: /screen con menos DPI
                 gs_preset, target_dpi = "/screen", 50
 
-            for idx, pdf_path in enumerate(archivos):
+            # Tres Ghostscript a la vez (antes, de a uno): cada PDF es independiente.
+            # Medido: 3 a la vez tardan casi lo mismo que 1 solo (19.7 s contra 16.5 s)
+            hilos = min(3, total_files)
+            reservadas, candado_nombres = set(), threading.Lock()
+            candado_avance = threading.Lock()
+            listos = [0]
+
+            def _comprimir_uno(pdf_path):
+                """Devuelve la línea del resumen de ese PDF."""
                 base_name = os.path.splitext(os.path.basename(pdf_path))[0]
                 out_path = None
                 try:
                     if not os.path.exists(pdf_path):
-                        report.append(f"{base_name}: ❌ El archivo ya no existe")
-                        continue
+                        return f"{base_name}: ❌ El archivo ya no existe"
 
                     folder = os.path.dirname(pdf_path)
                     if "PDF_OPTIMIZADO" in dest_choice:
@@ -10731,8 +13056,8 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
                         folder = self._ruta_destino(self.pdf_comp_dest_seg)
                     self._registrar_salida(self.pdf_comp_dest_seg, folder)
 
-                    out_path = _ruta_unica(os.path.join(folder, f"{base_name}_opt.pdf"))
-                    estado(f"Reconstruyendo {idx+1}/{total_files}...", "yellow")
+                    out_path = _ruta_unica_reservando(os.path.join(folder, f"{base_name}_opt.pdf"),
+                                                      reservadas, candado_nombres)
 
                     ok_gs, detalle_gs = self._gs_comprimir(
                         gs_exe, pdf_path, out_path, gs_preset, target_dpi)
@@ -10743,27 +13068,37 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
                         if final >= orig:
                             # No redujo (PDF ya optimizado): no se entrega un archivo más pesado
                             os.remove(out_path)
-                            report.append(
-                                f"{base_name}: ⚠️ OMITIDO: ya estaba optimizado (habría quedado en "
-                                f"{self._fmt_bytes(final)} y pesa {self._fmt_bytes(orig)}); "
-                                f"se conservó el original.")
-                        else:
-                            perc = int(((orig - final) / orig) * 100) if orig > 0 else 0
-                            msg = (f"¡Compresión exitosa!\n"
-                                   f" Tamaño original: {self._fmt_bytes(orig)}  →  "
-                                   f"Nuevo tamaño: {self._fmt_bytes(final)}  "
-                                   f"(Reducción del {perc}%)")
-                            print(f"✅ {base_name}: {msg}")
-                            report.append(f"{base_name}: ✅  {msg}")
-                    else:
-                        print(f"❌ Error GS en {base_name}: {detalle_gs}")
-                        if out_path and os.path.exists(out_path):
-                            os.remove(out_path)
-                        report.append(f"{base_name}: ❌ {detalle_gs or 'Ghostscript no pudo procesarlo'}")
+                            return (f"{base_name}: ⚠️ OMITIDO: ya estaba optimizado (habría quedado en "
+                                    f"{self._fmt_bytes(final)} y pesa {self._fmt_bytes(orig)}); "
+                                    f"se conservó el original.")
+                        perc = int(((orig - final) / orig) * 100) if orig > 0 else 0
+                        msg = (f"¡Compresión exitosa!\n"
+                               f" Tamaño original: {self._fmt_bytes(orig)}  →  "
+                               f"Nuevo tamaño: {self._fmt_bytes(final)}  "
+                               f"(Reducción del {perc}%)")
+                        print(f"✅ {base_name}: {msg}")
+                        return f"{base_name}: ✅  {msg}"
+                    print(f"❌ Error GS en {base_name}: {detalle_gs}")
+                    if out_path and os.path.exists(out_path):
+                        os.remove(out_path)
+                    return f"{base_name}: ❌ {detalle_gs or 'Ghostscript no pudo procesarlo'}"
                 except Exception as e:
                     print(f"Error general PDF: {e}")
-                    report.append(f"{base_name}: ❌ Error: {str(e)[:80]}")
-                self._en_ui(self.pdf_prog_bar.set, (idx + 1) / total_files)
+                    return f"{base_name}: ❌ Error: {str(e)[:80]}"
+                finally:
+                    with candado_avance:
+                        listos[0] += 1
+                        n = listos[0]
+                    self._en_ui(self.pdf_prog_bar.set, n / total_files)
+                    if n < total_files:
+                        estado(f"Reconstruyendo… {n}/{total_files} listos"
+                               + (f" ({hilos} a la vez)" if hilos > 1 else ""), "yellow")
+
+            estado(f"Reconstruyendo 0/{total_files}"
+                   + (f" ({hilos} a la vez)..." if hilos > 1 else "..."), "yellow")
+            with concurrent.futures.ThreadPoolExecutor(max_workers=hilos,
+                                                       thread_name_prefix="dmt_gs") as pool:
+                report.extend(pool.map(_comprimir_uno, archivos))     # map conserva el orden
 
             estado("✅ Optimización Finalizada", "#2cc985")
             self._en_ui(self.show_summary, report, "Compresión de PDF")
@@ -11513,16 +13848,19 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
             out_path = _ruta_unica(os.path.join(folder, "Imagenes_Unidas.pdf"))
             doc.save(out_path, garbage=3, deflate=True)
             texto = f"¡PDF creado! {os.path.basename(out_path)} ({_plural_pag(doc.page_count)})"
+            # El detalle va corto y en una segunda línea (antes era una sola línea larguísima)
+            notas = []
             if op.get("a4"):
                 # Qué pasó de verdad con el DPI elegido (es un techo, no una meta)
                 dpi = int(op.get("dpi") or 150)
                 if reducidas:
-                    texto += f" · {reducidas} reducida(s) a {dpi} DPI"
+                    notas.append(f"{reducidas} reducida{'s' if reducidas != 1 else ''} a {dpi} DPI")
                 if dpi_bajos:
-                    texto += (f" · {len(dpi_bajos)} ya estaba(n) por debajo de {dpi} DPI "
-                              f"(se dejaron igual, la más baja a {min(dpi_bajos)} DPI)")
+                    notas.append(f"{len(dpi_bajos)} ya bajo {dpi} DPI (mín. {min(dpi_bajos)})")
             if perdidas:
-                texto += f" · {perdidas} imagen(es) ya no existía(n)"
+                notas.append(f"{perdidas} no encontrada{'s' if perdidas != 1 else ''}")
+            if notas:
+                texto += "\n" + " · ".join(notas)
             estado(texto, self.col_accent)
         except Exception as e:
             estado(f"Error: {str(e)}", "red")
@@ -13223,6 +15561,7 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
         top.pack(fill="x", padx=20, pady=10)
         ctk.CTkButton(top, text="← Menú", width=80, fg_color="transparent", border_width=1,
                       command=lambda: self.show_frame("Menu")).pack(side="left")
+        self._boton_liberar_ia(top).pack(side="right")
 
         title_bg = ctk.CTkFrame(self.ocr_frame, fg_color="#2b2b2b", corner_radius=8)
         title_bg.pack(pady=5)
@@ -14064,6 +16403,20 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
         self.mic_mapping = devices 
         return list(devices.keys())
 
+    def _mics_detectar_fondo(self):
+        """Lista los micrófonos fuera del hilo de la interfaz y actualiza el selector."""
+        nombres = self.get_input_devices()
+        self._mics_detectados = nombres
+
+        def _aplicar():
+            try:
+                self.mic_combo.configure(values=nombres)
+                if self.live_mic_var.get() == "Detectando micrófonos…":
+                    self.live_mic_var.set(nombres[0] if nombres else "No detectado")
+            except Exception:
+                pass
+        self._en_ui(_aplicar)
+
     def get_selected_mic_index(self):
         """Busca el ID usando el nombre seleccionado en el ComboBox"""
         selected_name = self.live_mic_var.get()
@@ -14195,6 +16548,7 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
         top.pack(fill="x", padx=20, pady=10)
         ctk.CTkButton(top, text="← Menú", width=80, fg_color="transparent", border_width=1, 
                       command=lambda: self.show_frame("Menu")).pack(side="left")
+        self._boton_liberar_ia(top).pack(side="right")
         
         title_bg = ctk.CTkFrame(self.trans_frame, fg_color="#2b2b2b", corner_radius=8)
         title_bg.pack(pady=5)
@@ -14206,6 +16560,7 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
         self.trans_tabs.pack(pady=10,padx=40, fill="y", expand=True)
         self.trans_tabs.add("Archivos")
         self.trans_tabs.add("YouTube → Texto")
+        self.trans_tabs.add("Subtítulos y Letras")
         self.trans_tabs.add("En Vivo")
 
         # ==========================================
@@ -14225,14 +16580,14 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
                                                                                  ("Solo Video",    "*.mp4 *.mkv *.webm *.mov *.avi *.flv *.ts"),
                                                                                  ("Todos",         "*.*")
                                                                              ], self.trans_list_label, self.trans_drop_area))
-        self.trans_drop_area.pack(pady=10)
+        self.trans_drop_area.pack(pady=10, padx=self._TRANS_PADX, fill="x")
         self.trans_drop_area.drop_target_register(DND_FILES)
         self.trans_drop_area.dnd_bind('<<Drop>>', lambda e: self.handle_drop(e, self.trans_list_label, self.trans_drop_area))
         
         # Opciones Archivos
         # Opciones Archivos
-        opts = ctk.CTkFrame(tab_files, fg_color="#2b2b2b")
-        opts.pack(pady=10, ipadx=30)
+        opts = ctk.CTkFrame(tab_files, fg_color="#2b2b2b", corner_radius=8)
+        opts.pack(pady=10, padx=self._TRANS_PADX, fill="x")
 
         # --- 1. GPU INTELIGENTE (WHISPER FILE) ---
         gpu_active, gpu_text, gpu_col = self.analyze_gpu_hardware(is_video=False)
@@ -14268,6 +16623,11 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
         self.trans_traducir_var = ctk.BooleanVar(value=False)
         ctk.CTkCheckBox(row1, text="Traducir al inglés", variable=self.trans_traducir_var,
                         fg_color=c_main, hover_color=c_hover).pack(side="left", padx=(10, 5))
+        # ⚡ Modo rápido (por lotes): el mismo ajuste en Archivos y YouTube → Texto, y se guarda
+        self.trans_rapido_var = ctk.BooleanVar(value=bool(self._config_leer().get("trans_rapido", False)))
+        ctk.CTkCheckBox(row1, text="⚡ Modo rápido", variable=self.trans_rapido_var,
+                        fg_color=c_main, hover_color=c_hover,
+                        command=self._trans_guardar_rapido).pack(side="left", padx=(10, 5))
 
         row2 = ctk.CTkFrame(opts, fg_color="transparent")
         row2.pack(pady=5, padx=20)
@@ -14294,7 +16654,7 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
         
         # Progreso Archivos
         self.trans_prog_frame = ctk.CTkFrame(tab_files, fg_color="transparent")
-        self.trans_prog_frame.pack(pady=10) 
+        self.trans_prog_frame.pack(pady=10, padx=self._TRANS_PADX, fill="x") 
         
         info_row = ctk.CTkFrame(self.trans_prog_frame, fg_color="transparent")
         info_row.pack(fill="x")
@@ -14305,7 +16665,7 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
         
         self.trans_progress = ctk.CTkProgressBar(self.trans_prog_frame, width=500, height=15, progress_color=c_main)
         self.trans_progress.set(0)
-        self.trans_progress.pack(pady=10)
+        self.trans_progress.pack(pady=10, fill="x")
         self.trans_status = ctk.CTkLabel(self.trans_prog_frame, text="Listo", text_color="gray")
         self.trans_status.pack()
         
@@ -14326,23 +16686,20 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
 
         # Header informativo
         yt_info = ctk.CTkFrame(tab_yt, fg_color="#1a1a2e", corner_radius=8)
-        yt_info.pack(fill="x", padx=185, pady=(10, 8))
+        yt_info.pack(fill="x", padx=self._TRANS_PADX, pady=(8, 4))
         ctk.CTkLabel(yt_info,
-                     text="📺  Pega un enlace de YouTube (o cualquier plataforma compatible)",
-                     font=("Arial", 12), text_color="#aaa").pack(pady=(2, 0))
-        ctk.CTkLabel(yt_info,
-                     text="El audio se descarga como WAV temporal → Whisper lo transcribe → se elimina solo",
-                     font=("Arial", 11), text_color="#666").pack(pady=(0, 2))
+                     text="📺  YouTube, Spotify, TikTok…  ·  el audio se baja temporal, Whisper lo transcribe y se borra solo",
+                     font=("Arial", 12), text_color="#aaa").pack(pady=3)
 
         # Fila de URL — centrada, no estirada al borde
         yt_url_row = ctk.CTkFrame(tab_yt, fg_color="transparent")
-        yt_url_row.pack(anchor="center", pady=8)
+        yt_url_row.pack(fill="x", padx=self._TRANS_PADX, pady=4)
         self.yt_trans_url = ctk.CTkEntry(
             yt_url_row,
-            placeholder_text="Pega el link aquí (YouTube, FB, IG, etc)...",
-            height=40, width=480, fg_color="#1a1a1a", border_color="#333"
+            placeholder_text="Pega el link aquí (YouTube, Spotify, TikTok, IG, etc)...",
+            height=40, fg_color="#1a1a1a", border_color="#333"
         )
-        self.yt_trans_url.pack(side="left", padx=(0, 6))
+        self.yt_trans_url.pack(side="left", fill="x", expand=True, padx=(0, 6))
         self.yt_trans_url.bind("<Return>", lambda e: self.start_yt_transcribe())
 
         ctk.CTkButton(yt_url_row, text="📋 Pegar", width=70, height=40,
@@ -14358,7 +16715,7 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
 
         # Opciones de modelo, formato y destino
         yt_opts = ctk.CTkFrame(tab_yt, fg_color="#2b2b2b", corner_radius=8)
-        yt_opts.pack(padx=126, pady=5, ipadx=10, ipady=8, fill="x")
+        yt_opts.pack(padx=self._TRANS_PADX, pady=4, fill="x")
 
         # --- GPU / CUDA (FIX 2a) ---
         yt_gpu_active, yt_gpu_text, yt_gpu_col = self.analyze_gpu_hardware(is_video=False)
@@ -14367,7 +16724,7 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
         yt_state_switch = "normal" if yt_gpu_active else "disabled"
 
         yt_gpu_frame = ctk.CTkFrame(yt_opts, fg_color="transparent")
-        yt_gpu_frame.pack(pady=(12, 4))
+        yt_gpu_frame.pack(pady=(8, 2))
         self.switch_yt_trans_gpu = ctk.CTkSwitch(yt_gpu_frame, text="Uso de GPU (CUDA)",
                                                   variable=self.yt_trans_use_gpu,
                                                   progress_color=c_main,
@@ -14378,7 +16735,7 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
         # ---------------------------
 
         yt_row1 = ctk.CTkFrame(yt_opts, fg_color="transparent")
-        yt_row1.pack(pady=5)
+        yt_row1.pack(pady=3)
         ctk.CTkLabel(yt_row1, text="Modelo IA:").pack(side="left", padx=5)
         self.yt_trans_model_var = ctk.StringVar(value="small (Recomendado)")
         ctk.CTkOptionMenu(
@@ -14393,9 +16750,12 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
         self.yt_trans_traducir_var = ctk.BooleanVar(value=False)
         ctk.CTkCheckBox(yt_row1, text="Traducir al inglés", variable=self.yt_trans_traducir_var,
                         fg_color=c_main, hover_color=c_hover).pack(side="left", padx=(10, 5))
+        ctk.CTkCheckBox(yt_row1, text="⚡ Modo rápido", variable=self.trans_rapido_var,
+                        fg_color=c_main, hover_color=c_hover,
+                        command=self._trans_guardar_rapido).pack(side="left", padx=(10, 5))
 
         yt_row2 = ctk.CTkFrame(yt_opts, fg_color="transparent")
-        yt_row2.pack(pady=(0, 5))
+        yt_row2.pack(pady=(0, 3))
         ctk.CTkLabel(yt_row2, text="Formato:").pack(side="left", padx=5)
         self.yt_trans_fmt_var = ctk.StringVar(value=".txt (Texto Plano)")
         ctk.CTkOptionMenu(
@@ -14432,7 +16792,7 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
                 self.previous_dest_selections[self.yt_trans_dest_seg] = v
 
         yt_dest = ctk.CTkFrame(yt_opts, fg_color="transparent")
-        yt_dest.pack(pady=5)
+        yt_dest.pack(pady=(2, 6))
         self.yt_trans_dest_var = ctk.StringVar(value="📁 Transcripciones YT")
         self.yt_custom_dest_path = ""
         self.yt_trans_dest_seg = ctk.CTkSegmentedButton(
@@ -14448,18 +16808,25 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
 
         # Barra de progreso — con margen generoso (FIX 3a)
         yt_prog_frame = ctk.CTkFrame(tab_yt, fg_color="transparent")
-        yt_prog_frame.pack(padx=126, pady=5, fill="x")
+        yt_prog_frame.pack(padx=self._TRANS_PADX, pady=(4, 2), fill="x")
         self.yt_trans_progress = ctk.CTkProgressBar(
             yt_prog_frame, height=14, progress_color=c_main)
         self.yt_trans_progress.set(0)
         self.yt_trans_progress.pack(fill="x")
+        # Estado y reloj en la misma fila (reloj como en Archivos: dorado mientras
+        # trabaja, verde con el total al terminar)
+        yt_estado_fila = ctk.CTkFrame(yt_prog_frame, fg_color="transparent")
+        yt_estado_fila.pack(fill="x", pady=(3, 0))
+        self.yt_trans_time_lbl = ctk.CTkLabel(yt_estado_fila, text="⏱️ --:--:--",
+                                              font=(self.main_font, 14), text_color="#d4ac0d")
+        self.yt_trans_time_lbl.pack(side="right")
         self.yt_trans_status = ctk.CTkLabel(
-            yt_prog_frame, text="Listo", text_color="gray", font=("Arial", 11))
-        self.yt_trans_status.pack(pady=(4, 0))
+            yt_estado_fila, text="Listo", text_color="gray", font=("Arial", 11))
+        self.yt_trans_status.pack(side="left")
 
         # Botones de acción
         yt_actions = ctk.CTkFrame(tab_yt, fg_color="transparent")
-        yt_actions.pack(pady=8)
+        yt_actions.pack(pady=4)
         self.yt_trans_btn = ctk.CTkButton(
             yt_actions, text="▶ DESCARGAR Y TRANSCRIBIR",
             height=45, width=240, fg_color=c_main, hover_color=c_hover,
@@ -14478,29 +16845,22 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
                       fg_color="#2b2b2b", hover_color="#3a3a3a", border_width=1, border_color="#555",
                       command=lambda: self._abrir_carpeta_transcripciones(yt=True)).pack(side="left", padx=8)
 
-        # Log / resultado — con margen generoso (FIX 3a)
+        # Registro: Copiar / Limpiar arriba y la consola al final, con el alto que
+        # quede (antes los botones de abajo se cortaban)
         self.yt_trans_log = ctk.CTkTextbox(
-            tab_yt, height=160, fg_color="#101010",
-            text_color="#e0e0e0", font=("Consolas", 12))
-        self.yt_trans_log.pack(fill="x", padx=126, pady=(5, 0))
-
-        yt_bot = ctk.CTkFrame(tab_yt, fg_color="transparent")
-        yt_bot.pack(pady=6)
-        ctk.CTkButton(yt_bot, text="📋 Copiar texto", width=120, fg_color="#444",
-                      command=lambda: (
-                          self.clipboard_clear(),
-                          self.clipboard_append(self.yt_trans_log.get("1.0", "end").strip())
-                      )).pack(side="left", padx=5)
-        ctk.CTkButton(yt_bot, text="🗑 Limpiar", width=90, fg_color="#333",
-                      command=lambda: (
-                          self.yt_trans_log.configure(state="normal"),
-                          self.yt_trans_log.delete("1.0", "end"),
-                          self.yt_trans_log.configure(state="disabled")
-                      )).pack(side="left", padx=5)
+            tab_yt, height=220, fg_color="#101010",
+            text_color="#e0e0e0", font=("Consolas", 12), wrap="word",
+            scrollbar_button_color="#555", scrollbar_button_hover_color="#777")
+        self._log_cabecera(tab_yt, self.yt_trans_log)
+        self.yt_trans_log.pack(fill="both", expand=True, padx=self._TRANS_PADX, pady=(0, 8))
+        self.yt_trans_log.configure(state="disabled")     # solo lectura: no se puede escribir encima
 
         # ==========================================
         # PESTAÑA 3: EN VIVO (ACTUALIZADA V2)
         # ==========================================
+        # PESTAÑA "SUBTÍTULOS Y LETRAS" (sin audio ni Whisper)
+        self._init_tab_subtitulos(self.trans_tabs.tab("Subtítulos y Letras"), c_main, c_hover)
+
         tab_live = self.trans_tabs.tab("En Vivo")
         
         # --- A. BARRA DE CONFIGURACIÓN ---
@@ -14514,7 +16874,9 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
         ctk.CTkLabel(row_mic, text="🎙️ Entrada de Audio:", font=("Arial", 12, "bold")).pack(side="left", padx=5)
         
         # Obtenemos nombres limpios
-        mic_names = self.get_input_devices()
+        # Listar micrófonos con PyAudio tarda ~0.2 s: se hace en segundo plano
+        # (antes congelaba la interfaz al armar esta pantalla)
+        mic_names = list(getattr(self, "_mics_detectados", None) or ["Detectando micrófonos…"])
         
         # Variable y ComboBox
         self.live_mic_var = ctk.StringVar(value=mic_names[0] if mic_names else "No detectado")
@@ -14522,6 +16884,9 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
                                          width=400, fg_color="#333", button_color="#444",
                                          dropdown_fg_color="#2b2b2b", font=("Arial", 13))
         self.mic_combo.pack(side="left", padx=10)
+        if not getattr(self, "_mics_detectados", None):
+            threading.Thread(target=self._mics_detectar_fondo, name="dmt_microfonos",
+                             daemon=True).start()
         
         # Botón Recargar
         ctk.CTkButton(row_mic, text="🔄", width=30, fg_color="#444", hover_color="#555",
@@ -14607,6 +16972,865 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
         ctk.CTkButton(bot_live, text="💾 Guardar como TXT", width=150, fg_color=c_main, hover_color=c_hover,
                       command=self.save_live_text).pack(side="right", padx=5)
 
+    # ==========================================================================
+    #   TRANSCRIPCIÓN → PESTAÑA "SUBTÍTULOS Y LETRAS" (sin audio ni Whisper)
+    # ==========================================================================
+    _TRANS_PADX = 126       # margen de los bloques: el mismo ancho en Archivos, YouTube → Texto y aquí
+    _SUBS_MODO_SUBS = "💬 Subtítulos"
+    _SUBS_MODO_LETRA = "🎵 Letra de canción"
+    _LETRA_FMT_TXT = "📝 Solo letra (.txt)"
+    _LETRA_FMT_LRC = "⏱️ Con tiempos (.lrc)"
+    _SUBS_DEST_DEFAULT = "📁 Subtítulos y Letras"
+    # Subtítulos que pintan a cada persona de un color (<font color="…">)
+    _SUBS_COLORES = {"texto": "📝 Solo texto", "persona": "👤 Persona 1, 2…", "original": "🎨 Original"}
+
+    # --- Registro con colores (Subtítulos y Letras, YouTube → Texto) ---
+    _LOG_COLORES = (
+        (("✅", "💾"), "#2ecc71"), (("❌",), "#e74c3c"), (("⚠️", "⚠", "⏹", "🚫", "⛔"), "#f39c12"),
+        (("🏁",), "#58d68d"), (("📡", "🔍"), "#5dade2"), (("🎬", "🎵", "💬", "───", "📋"), "#f5b041"),
+        (("·",), "#8c8c8c"), (("⚡", "🐢"), "#bb8fce"),
+    )
+
+    def _log_en_caja(self, caja, mensaje, color=None):
+        """(Hilo de la interfaz) Agrega una línea al registro con el color de su tipo de mensaje."""
+        if color is None:
+            limpio = str(mensaje).strip()
+            color = next((c for prefijos, c in self._LOG_COLORES if limpio.startswith(prefijos)), None)
+        try:
+            # Si subiste a leer algo, no se salta al final con cada línea nueva
+            try:
+                al_final = caja.yview()[1] >= 0.999
+            except Exception:
+                al_final = True
+            caja.configure(state="normal")
+            if color:
+                etiqueta = "c_" + re.sub(r"[^0-9a-zA-Z]", "", str(color)).lower()
+                caja.tag_config(etiqueta, foreground=color)
+                caja.insert("end", f"{mensaje}\n", etiqueta)
+            else:
+                caja.insert("end", f"{mensaje}\n")
+            if al_final:
+                caja.see("end")
+            caja.configure(state="disabled")
+        except Exception:
+            pass
+
+    def _log_cabecera(self, tab, caja):
+        """Fila 'Registro' con Copiar / Limpiar ARRIBA de la consola: así nunca queda cortada abajo."""
+        fila = ctk.CTkFrame(tab, fg_color="transparent")
+        fila.pack(fill="x", padx=self._TRANS_PADX, pady=(6, 2))
+        ctk.CTkLabel(fila, text="📝 Registro", font=("Arial", 11), text_color="#777").pack(side="left")
+        ctk.CTkButton(fila, text="🗑 Limpiar", width=80, height=24, fg_color="#333", hover_color="#444",
+                      command=lambda: self._log_limpiar(caja)).pack(side="right")
+        ctk.CTkButton(fila, text="📋 Copiar texto", width=110, height=24, fg_color="#444", hover_color="#555",
+                      command=lambda: self._log_copiar(caja)).pack(side="right", padx=(0, 6))
+        return fila
+
+    def _log_copiar(self, caja):
+        try:
+            self.clipboard_clear()
+            self.clipboard_append(caja.get("1.0", "end").strip())
+        except Exception:
+            pass
+
+    @staticmethod
+    def _log_limpiar(caja):
+        try:
+            caja.configure(state="normal")
+            caja.delete("1.0", "end")
+            caja.configure(state="disabled")
+        except Exception:
+            pass
+
+    def _modal_mostrar(self, win):
+        """(Hilo de la interfaz) Muestra una ventana modal y espera a que se cierre."""
+        def _modal(intentos=0):
+            try:
+                if not win.winfo_exists():
+                    return
+                if win.winfo_viewable():
+                    win.grab_set()
+                elif intentos < 60:
+                    self.after(50, lambda: _modal(intentos + 1))
+            except Exception:
+                pass
+
+        self._ventana_mostrar(win)
+        self.after(60, _modal)
+        self.wait_window(win)
+
+    def _subs_carpeta_default(self):
+        return os.path.join(os.path.expanduser("~"), "Downloads", "Subtitulos_y_Letras")
+
+    def _subs_carpeta_destino(self):
+        if "Elegir Otra" in self.subs_dest_var.get() and getattr(self, "subs_dest_path", ""):
+            return self.subs_dest_path
+        return self._subs_carpeta_default()
+
+    def _init_tab_subtitulos(self, tab, c_main, c_hover):
+        self._subs_analisis = None
+        self._subs_ultimos_idiomas = set()
+        self._subs_c_main, self._subs_c_hover = c_main, c_hover
+        self.subs_dest_path = ""
+        padx = self._TRANS_PADX
+
+        info = ctk.CTkFrame(tab, fg_color="#1a1a2e", corner_radius=8)
+        info.pack(fill="x", padx=padx, pady=(10, 6))
+        ctk.CTkLabel(info, text="💬  Subtítulos de un video (sin bajar el audio ni usar IA)  ·  🎵 letra de una canción",
+                     font=("Arial", 12), text_color="#aaa").pack(pady=(2, 0))
+        ctk.CTkLabel(info, text="YouTube, YouTube Music, Spotify y otras plataformas compatibles",
+                     font=("Arial", 11), text_color="#666").pack(pady=(0, 2))
+
+        fila_url = ctk.CTkFrame(tab, fg_color="transparent")
+        fila_url.pack(fill="x", padx=padx, pady=6)
+        self.subs_url = ctk.CTkEntry(fila_url, placeholder_text="Pega el link aquí (YouTube, YT Music, Spotify...)",
+                                     height=40, fg_color="#1a1a1a", border_color="#333")
+        self.subs_url.pack(side="left", fill="x", expand=True, padx=(0, 6))
+        self.subs_url.bind("<Return>", lambda e: self._subs_iniciar())
+        ctk.CTkButton(fila_url, text="📋 Pegar", width=70, height=40, fg_color="#444", hover_color="#555",
+                      command=self._subs_pegar).pack(side="left", padx=4)
+        ctk.CTkButton(fila_url, text="🗑", width=38, height=40, fg_color="#8B0000", hover_color="#cc0000",
+                      command=lambda: self.subs_url.delete(0, "end")).pack(side="left", padx=(2, 0))
+
+        opts = ctk.CTkFrame(tab, fg_color="#2b2b2b", corner_radius=8)
+        opts.pack(fill="x", padx=padx, pady=5, ipady=4)
+
+        fila_modo = ctk.CTkFrame(opts, fg_color="transparent")
+        fila_modo.pack(pady=(10, 4))
+        ctk.CTkLabel(fila_modo, text="Descargar:").pack(side="left", padx=5)
+        self.subs_modo_var = ctk.StringVar(value=self._SUBS_MODO_SUBS)
+        ctk.CTkSegmentedButton(fila_modo, values=[self._SUBS_MODO_SUBS, self._SUBS_MODO_LETRA],
+                               variable=self.subs_modo_var, selected_color=c_main,
+                               selected_hover_color=c_hover,
+                               command=self._subs_on_modo).pack(side="left", padx=8)
+
+        cont = ctk.CTkFrame(opts, fg_color="transparent")
+        cont.pack(pady=4)
+        self.subs_fila_subs = ctk.CTkFrame(cont, fg_color="transparent")
+        ctk.CTkLabel(self.subs_fila_subs, text="Formato:").pack(side="left", padx=5)
+        self.subs_fmt_var = ctk.StringVar(value=".srt (Subtítulos)")
+        ctk.CTkOptionMenu(self.subs_fila_subs, values=[".srt (Subtítulos)", ".vtt (Web Video)", ".txt (Texto Plano)"],
+                          variable=self.subs_fmt_var, width=150, fg_color="#444").pack(side="left", padx=5)
+        # Colores por persona: se recuerda (config.json)
+        ctk.CTkLabel(self.subs_fila_subs, text="Colores:").pack(side="left", padx=(12, 5))
+        self.subs_colores_var = ctk.StringVar(value=self._SUBS_COLORES.get(
+            self._config_leer().get("subs_colores"), self._SUBS_COLORES["texto"]))
+        ctk.CTkSegmentedButton(self.subs_fila_subs, values=list(self._SUBS_COLORES.values()),
+                               variable=self.subs_colores_var, selected_color=c_main,
+                               selected_hover_color=c_hover,
+                               command=lambda _v: self._config_guardar(subs_colores=self._subs_colores_clave())
+                               ).pack(side="left", padx=5)
+        self.subs_fila_letra = ctk.CTkFrame(cont, fg_color="transparent")
+        ctk.CTkLabel(self.subs_fila_letra, text="Formato:").pack(side="left", padx=5)
+        self.subs_letra_fmt_var = ctk.StringVar(value=self._LETRA_FMT_TXT)
+        ctk.CTkSegmentedButton(self.subs_fila_letra, values=[self._LETRA_FMT_TXT, self._LETRA_FMT_LRC],
+                               variable=self.subs_letra_fmt_var, selected_color=c_main,
+                               selected_hover_color=c_hover).pack(side="left", padx=8)
+        ctk.CTkLabel(self.subs_fila_letra, text="Fuentes: LRCLIB, YouTube Music y otros",
+                     font=("Arial", 10), text_color="#777").pack(side="left", padx=(6, 0))
+        self.subs_fila_subs.pack()
+
+        dest = ctk.CTkFrame(opts, fg_color="transparent")
+        dest.pack(pady=(4, 8))
+        self.subs_dest_var = ctk.StringVar(value=self._SUBS_DEST_DEFAULT)
+        self.subs_dest_seg = ctk.CTkSegmentedButton(dest, values=[self._SUBS_DEST_DEFAULT, "↗️ Elegir Otra..."],
+                                                    variable=self.subs_dest_var, selected_color=c_main,
+                                                    command=self._subs_on_destino)
+        self.subs_dest_seg.pack()
+        self.subs_dest_lbl = ctk.CTkLabel(dest, text=f"↪ {self._subs_carpeta_default()}",
+                                          text_color="gray", font=("Arial", 10))
+        self.subs_dest_lbl.pack()
+
+        self.subs_status = ctk.CTkLabel(tab, text="Listo", text_color="gray", font=("Arial", 11))
+        self.subs_status.pack(pady=(4, 0))
+
+        acciones = ctk.CTkFrame(tab, fg_color="transparent")
+        acciones.pack(pady=6)
+        # Un solo botón: en Subtítulos analiza y abre la ventana de idiomas; en Letra baja directo
+        self.subs_btn_bajar = ctk.CTkButton(acciones, text="🔍 BUSCAR Y DESCARGAR", height=45, width=230,
+                                            fg_color=c_main, hover_color=c_hover,
+                                            font=(self.main_font, 13, "bold"),
+                                            command=self._subs_iniciar)
+        self.subs_btn_bajar.pack(side="left", padx=8)
+        self.subs_btn_detener = ctk.CTkButton(acciones, text="⛔ Detener", height=45, width=110,
+                                              fg_color="#c0392b", hover_color="#922b21", state="disabled",
+                                              command=self._subs_pedir_detener)
+        self.subs_btn_detener.pack(side="left", padx=4)
+        ctk.CTkButton(acciones, text="📂 Abrir Carpeta", height=45, width=140,
+                      fg_color="#2b2b2b", hover_color="#3a3a3a", border_width=1, border_color="#555",
+                      command=self._subs_abrir_carpeta).pack(side="left", padx=8)
+
+        self.subs_log_box = ctk.CTkTextbox(tab, height=110, fg_color="#101010", text_color="#e0e0e0",
+                                           font=("Consolas", 12), wrap="word",
+                                           scrollbar_button_color="#555",
+                                           scrollbar_button_hover_color="#777")
+        self._log_cabecera(tab, self.subs_log_box)
+        # Al final y con expand: si falta alto, se achica la consola y no se corta nada más
+        self.subs_log_box.pack(fill="both", expand=True, padx=padx, pady=(0, 8))
+        self.subs_log_box.configure(state="disabled")
+
+    def _subs_on_modo(self, valor=None):
+        letra = (valor or self.subs_modo_var.get()) == self._SUBS_MODO_LETRA
+        self.subs_fila_subs.pack_forget()
+        self.subs_fila_letra.pack_forget()
+        (self.subs_fila_letra if letra else self.subs_fila_subs).pack()
+
+    def _subs_colores_clave(self):
+        etiqueta = self.subs_colores_var.get()
+        return next((k for k, v in self._SUBS_COLORES.items() if v == etiqueta), "texto")
+
+    def _subs_on_destino(self, valor):
+        if "Elegir Otra" in valor:
+            ruta = filedialog.askdirectory()
+            if ruta:
+                self.subs_dest_path = ruta
+            elif not self.subs_dest_path:
+                self.subs_dest_seg.set(self._SUBS_DEST_DEFAULT)
+        self.subs_dest_lbl.configure(text=f"↪ {self._subs_carpeta_destino()}")
+
+    def _subs_pegar(self):
+        try:
+            texto = self.clipboard_get()
+        except Exception:
+            return
+        self.subs_url.delete(0, "end")
+        self.subs_url.insert(0, texto.strip())
+
+    def _subs_abrir_carpeta(self):
+        carpeta = getattr(self, "_subs_ultima_carpeta", "") or self._subs_carpeta_destino()
+        os.makedirs(carpeta, exist_ok=True)
+        self._abrir_en_explorador(carpeta)
+
+    def _subs_log(self, mensaje, color=None):
+        """Al registro de la pestaña (con color según el tipo de mensaje) y a la consola / log."""
+        print(f"[Subtítulos/Letras] {mensaje}")
+        self._en_ui(self._log_en_caja, self.subs_log_box, mensaje, color)
+
+    def _subs_estado(self, texto, color="white"):
+        self._en_ui(self.subs_status.configure, text=texto, text_color=color)
+
+    def _subs_bloquear(self, ocupado):
+        for b, estado in ((self.subs_btn_bajar, "disabled" if ocupado else "normal"),
+                          (self.subs_btn_detener, "normal" if ocupado else "disabled")):
+            try:
+                b.configure(state=estado)
+            except Exception:
+                pass
+
+    def _subs_pedir_detener(self):
+        self._subs_detener = True
+        self._subs_estado("⏹ Deteniendo después del archivo actual…", "orange")
+
+    @staticmethod
+    def _subs_nombre_archivo(texto, defecto="subtitulos"):
+        limpio = "".join(c for c in str(texto or "") if c not in '<>:"/\\|?*' and ord(c) >= 32)
+        return limpio.strip(" .")[:90] or defecto
+
+    @staticmethod
+    def _subs_texto_error(e):
+        texto = (str(e).strip().splitlines() or [type(e).__name__])[0]
+        texto = re.sub(r"^(ERROR:\s*)+", "", texto).strip() or type(e).__name__
+        if "429" in texto:
+            texto = ("YouTube está limitando las descargas (HTTP 429). "
+                     "Espera unos minutos e intenta de nuevo.")
+        return texto
+
+    def _subs_iniciar(self, *_):
+        if getattr(self, "_subs_ocupado", False):
+            return
+        url = self.subs_url.get().strip()
+        if not url:
+            self._subs_estado("Pega un enlace primero.", "orange")
+            return
+        if yt_dlp is None and not es_url_spotify(url):
+            self._subs_estado("El módulo aún se está cargando, espera unos segundos."
+                              if not _tier2_listo.is_set()
+                              else "yt-dlp no está disponible: actualízalo desde YouTube Downloader.",
+                              "orange")
+            return
+        fmt = self.subs_fmt_var.get()
+        params = {
+            "url": url,
+            "modo": "letra" if self.subs_modo_var.get() == self._SUBS_MODO_LETRA else "subs",
+            "formato": ".txt" if ".txt" in fmt else ".vtt" if ".vtt" in fmt else ".srt",
+            "colores": self._subs_colores_clave(),
+            "con_tiempos": self.subs_letra_fmt_var.get() == self._LETRA_FMT_LRC,
+            "destino": self._subs_carpeta_destino(),
+        }
+        self.subs_url.delete(0, "end")          # como en YouTube → Texto: el enlace ya pasó al hilo
+        self._subs_ocupado = True
+        self._subs_detener = False
+        self._subs_bloquear(True)
+        self._trabajo_inicio("subs_letras", "Subtítulos y letras")
+        threading.Thread(target=self._subs_hilo, args=(params,), name="dmt_subs_letras",
+                         daemon=True).start()
+
+    def _subs_hilo(self, p):
+        try:
+            a = self._subs_analisis
+            if not a or a.get("url") != p["url"] or time.time() - a.get("t", 0) > 1200:
+                a = self._subs_analizar(p["url"])
+                a["t"] = time.time()
+                self._subs_analisis = a
+            else:
+                self._subs_log(f"📡 {p['url']}")
+            modo = p["modo"]
+            if a["spotify"] and modo == "subs":
+                self._subs_log("⚠️ Spotify no tiene subtítulos: se descarga la letra.")
+                modo = "letra"
+            if a.get("playlist"):
+                a = self._subs_confirmar_lista(a, modo)
+                if a is None:
+                    self._subs_log("⏹ Cancelado: no se descargó la lista.")
+                    self._subs_estado("Cancelado", "orange")
+                    return
+            if modo == "subs" and a.get("playlist"):
+                if self._subs_bajar_subtitulos_lista(a, p) != "letra":
+                    return
+                self._subs_log("🎵 Se busca la letra de las canciones de la lista en su lugar.")
+                modo = "letra"
+            elif modo == "subs":
+                self._subs_resumen_video(a)
+                if not a["opciones"]:
+                    self._subs_estado("Sin subtítulos. Si es una canción, usa «🎵 Letra de canción».", "orange")
+                    return
+                self._subs_estado("Elige los idiomas en la ventana…", "cyan")
+                elegidos = self._en_ui_espera(self._subs_elegir_idiomas, a)
+                if elegidos == "letra":
+                    self._subs_log("🎵 Se busca la letra de la canción en su lugar.")
+                    modo = "letra"
+                elif not elegidos:
+                    self._subs_log("⏹ Cancelado: no se eligió ningún idioma.")
+                    self._subs_estado("Cancelado", "orange")
+                    return
+                else:
+                    self._subs_bajar_subtitulos(a, p, elegidos)
+            if modo == "letra":
+                self._subs_bajar_letras(a, p)
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            texto = self._subs_texto_error(e)
+            self._subs_log(f"❌ {texto}")
+            self._subs_estado(f"❌ {texto[:95]}", "#e74c3c")
+        finally:
+            self._subs_ocupado = False
+            self._en_ui(self._subs_bloquear, False)
+            self._trabajo_fin("subs_letras")
+
+    # Listas largas: se procesan de a 25 y en cada tanda se pregunta si se sigue
+    _SUBS_TANDA = 25
+
+    def _subs_analizar(self, url):
+        """
+        Qué subtítulos tiene el enlace y qué canción es. Si es una lista (playlist o
+        álbum de YouTube / YouTube Music, de otro sitio o de Spotify), sus elementos.
+        """
+        self._subs_estado("🔍 Analizando enlace...", "cyan")
+        self._subs_log(f"📡 {url}")
+        if es_url_spotify(url):
+            if not asegurar_spotdl_disponible(status_cb=lambda m: self._subs_log(f"   · {m}")):
+                raise RuntimeError("spotDL no está disponible en esta instalación.")
+            carpeta_tmp = tempfile.mkdtemp(prefix="letras_sp_")
+            try:
+                canciones = _spotdl_listar(url, ["--simple-tui", "--log-level", "INFO"],
+                                           carpeta_tmp=carpeta_tmp)
+            finally:
+                shutil.rmtree(carpeta_tmp, ignore_errors=True)
+            if not canciones:
+                raise RuntimeError("No se pudo leer el enlace de Spotify (¿es de una canción, "
+                                   "álbum o playlist? ¿hay conexión?).")
+            lista = [{"titulo": c.get("name") or "",
+                      "artista": ((c.get("artists") or [c.get("artist") or ""])[0] or ""),
+                      "album": c.get("album_name"), "duracion": c.get("duration"), "video_id": None,
+                      "lista": c.get("list_name") or c.get("album_name")} for c in canciones]
+            return {"url": url, "spotify": True, "info": None, "opciones": [], "canciones": lista,
+                    "titulo": (lista[0].get("lista") or lista[0]["titulo"]) if len(lista) > 1 else lista[0]["titulo"],
+                    "playlist": len(lista) > 1}
+
+        # YouTube con ?list= (sin ser un mix): la lista, como en YouTube Downloader
+        lista_id, video_id = self._subs_lista_de_url(url)
+        if lista_id:
+            import urllib.parse as _up
+            host = (_up.urlparse(url).netloc or "").lower()
+            host = "www.youtube.com" if (not host or "youtu.be" in host) else host
+            try:
+                a = self._subs_analizar_lista(f"https://{host}/playlist?list={lista_id}")
+            except Exception as e:
+                if not video_id:
+                    raise
+                a = None
+                self._subs_log(f"   ⚠️ No se pudo leer la lista ({self._subs_texto_error(e)[:80]}): "
+                               f"se usa solo el video.")
+            if a:
+                a["url"] = url
+                a["video_suelto"] = url if video_id else None
+                return a
+        return self._subs_analizar_video(url)
+
+    def _subs_analizar_video(self, url, sin_listas=False):
+        """Un solo video (con noplaylist). sin_listas=True: nunca devuelve una lista."""
+        opts = {"quiet": True, "no_warnings": True, "noplaylist": True, "skip_download": True,
+                "socket_timeout": 20}
+        opts.update(_yt_opts_robustos())
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            info = ydl.extract_info(url, download=False, process=False)
+            if info and info.get("_type") in ("url", "url_transparent"):
+                info = ydl.extract_info(url, download=False)
+        if not info:
+            raise RuntimeError("No se pudo leer el enlace.")
+        if info.get("_type") == "playlist":
+            a = None if sin_listas else self._subs_analizar_lista(url)
+            if not a:
+                raise RuntimeError("Es una lista de reproducción vacía o que no se pudo leer.")
+            return a
+        cancion = _cancion_desde_info(info)
+        return {"url": url, "spotify": False, "info": info, "opciones": _subs_opciones_de(info),
+                "canciones": [cancion], "titulo": info.get("title") or cancion.get("titulo") or ""}
+
+    @staticmethod
+    def _subs_lista_de_url(url):
+        """(id de la lista, id del video o None) si es un enlace de YouTube con lista (no un mix)."""
+        import urllib.parse as _up
+        try:
+            partes = _up.urlparse(str(url or "").strip())
+        except Exception:
+            return None, None
+        host = (partes.netloc or "").lower()
+        if "youtube.com" not in host and "youtu.be" not in host:
+            return None, None
+        q = _up.parse_qs(partes.query)
+        lista = (q.get("list") or [""])[0]
+        if not lista or lista.startswith("RD") or "start_radio=1" in str(url):
+            return None, None
+        video = (q.get("v") or [""])[0] or (partes.path.strip("/") if "youtu.be" in host else "")
+        return lista, (video or None)
+
+    def _subs_analizar_lista(self, url):
+        """Los elementos de una lista (lectura rápida: un pedido, sin analizar cada video)."""
+        opts = {"quiet": True, "no_warnings": True, "skip_download": True,
+                "extract_flat": "in_playlist", "socket_timeout": 20}
+        opts.update(_yt_opts_robustos())
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+        entradas = []
+        for e in (info or {}).get("entries") or []:
+            if not isinstance(e, dict) or e.get("_type") == "playlist":
+                continue
+            titulo = str(e.get("title") or "")
+            if titulo in ("[Private video]", "[Deleted video]"):
+                continue                        # videos privados o borrados de la lista
+            enlace = e.get("url") or e.get("webpage_url")
+            if not enlace and e.get("id") and "youtube" in str(e.get("ie_key") or "").lower():
+                enlace = f"https://www.youtube.com/watch?v={e['id']}"
+            if enlace:
+                entradas.append({"url": enlace, "titulo": titulo or enlace, "plana": e})
+        if not entradas:
+            return None
+        titulo = str(info.get("title") or "Lista")
+        # Álbum de YouTube Music: la lista se llama "Album - <nombre>" (ayuda a hallar la letra exacta)
+        album = titulo.split(" - ", 1)[1].strip() if titulo.lower().startswith(("album - ", "álbum - ")) else None
+        canciones = []
+        for x in entradas:
+            e = dict(x["plana"])
+            e.setdefault("extractor_key", e.get("ie_key") or info.get("extractor_key"))
+            c = _cancion_desde_info(e)
+            if album and not c.get("album"):
+                c["album"] = album
+            c["lista"] = album or titulo
+            canciones.append(c)
+        return {"url": url, "spotify": False, "playlist": True, "info": None, "opciones": [],
+                "entradas": entradas, "canciones": canciones, "titulo": album or titulo}
+
+    def _subs_confirmar_lista(self, a, modo):
+        """
+        (Hilo de trabajo) Como en YouTube Downloader: avisa que es una lista y pregunta
+        si se descarga. Si el enlace era de un video DENTRO de una lista, se puede
+        elegir solo ese video. Devuelve el análisis a usar o None si se cancela.
+        """
+        n = len(a.get("entradas") or a.get("canciones") or [])
+        que = "canciones" if (modo == "letra" or a.get("spotify")) else "videos"
+        T = self._SUBS_TANDA
+        texto = f"Se detectó una lista de {n} {que}:\n\n\"{str(a.get('titulo') or '')[:80]}\""
+        if n > T:
+            texto += (f"\n\nSon más de {T}: se procesan de {T} en {T} y al terminar cada tanda "
+                      f"te pregunto si sigues.")
+        self._subs_estado("¿Descargar la lista? Responde en la ventana…", "cyan")
+        if a.get("video_suelto"):
+            r = self._en_ui_espera(messagebox.askyesnocancel, "Lista detectada",
+                                   texto + "\n\n¿Descargar toda la lista?\n\n"
+                                           "Sí = toda la lista      No = solo este video")
+            if r is None:
+                return None
+            if r is False:
+                self._subs_log("   · Solo este video (sin el resto de la lista).")
+                return self._subs_analizar_video(a["video_suelto"], sin_listas=True)
+        elif not self._en_ui_espera(messagebox.askyesno, "Lista detectada",
+                                    texto + "\n\n¿Deseas continuar?"):
+            return None
+        self._subs_log(f"📋 Lista: {a.get('titulo')} ({n} {que})")
+        return a
+
+    def _subs_seguir_tanda(self, hechos, total, que):
+        """Listas de más de 25: al completar cada tanda de 25 pregunta si se sigue."""
+        T = self._SUBS_TANDA
+        if total <= T or hechos <= 0 or hechos % T:
+            return True
+        falta = total - hechos
+        self._subs_estado(f"⏸ Van {hechos} de {total}: ¿seguir? Responde en la ventana…", "cyan")
+        return bool(self._en_ui_espera(
+            messagebox.askyesno, "Continuar lista",
+            f"Van {hechos} de {total} {que}.\n\n¿Seguir con los siguientes {min(T, falta)}?"
+            f"\n(Quedan {falta}.)"))
+
+    def _subs_pausa_lista(self, minimo, maximo):
+        """Pausa entre elementos de una lista (sin saturar al sitio: evita bloqueos y el HTTP 429)."""
+        _esperar_entre_items(
+            random.uniform(minimo, maximo), lambda: getattr(self, "_subs_detener", False),
+            on_tick=lambda s: self._subs_estado(f"⏳ Esperando {s}s antes del siguiente…", "#888888"))
+
+    @staticmethod
+    def _subs_equivalentes_lista(eleccion, opciones):
+        """Los idiomas elegidos en el primer video, aplicados a otro: el mismo o su variante (es / es-419)."""
+        def _base(lang):
+            return _subs_idioma_base(lang) or str(lang).lower().split("-")[0]
+        salida = []
+        for lang, dic in eleccion:
+            igual = next((o for o in opciones if o[1] == lang and o[2] == dic and o not in salida), None)
+            igual = igual or next((o for o in opciones if o[2] == dic and o not in salida
+                                   and _base(o[1]) == _base(lang)), None)
+            if igual:
+                salida.append(igual)
+        return salida
+
+    def _subs_bajar_subtitulos_lista(self, a, p):
+        """
+        Subtítulos de cada video de una lista. Los idiomas se eligen en el primer video
+        que tenga y se usan en todos. Pausa de 2 a 5 s entre videos (como en YouTube
+        Downloader) y, con más de 25, se pregunta en cada tanda si se sigue.
+        Devuelve "letra" si en la ventana se pidió bajar las letras en su lugar.
+        """
+        entradas = a["entradas"]
+        total = len(entradas)
+        destino = os.path.join(p["destino"], self._subs_nombre_archivo(f"Subtítulos - {a['titulo']}"))
+        p2 = dict(p, destino=destino)
+        eleccion = None
+        videos_ok = archivos = sin_subs = errores = 0
+        detenido = False
+        for i, e in enumerate(entradas, start=1):
+            if getattr(self, "_subs_detener", False) or not self._subs_seguir_tanda(i - 1, total, "videos"):
+                detenido = True
+                break
+            if i > 1:
+                self._subs_pausa_lista(2, 5)
+                if getattr(self, "_subs_detener", False):
+                    detenido = True
+                    break
+            self._subs_estado(f"🔍 ({i}/{total}) {e['titulo'][:70]}", "cyan")
+            self._subs_log(f"🎬 [{i}/{total}] {e['titulo']}")
+            try:
+                v = self._subs_analizar_video(e["url"], sin_listas=True)
+            except Exception as ex:
+                errores += 1
+                self._subs_log(f"   ❌ {self._subs_texto_error(ex)}")
+                continue
+            if not v["opciones"]:
+                sin_subs += 1
+                self._subs_log("   ⚠️ Este video no tiene subtítulos.")
+                continue
+            if eleccion is None:
+                v["nota"] = (f"Video {i} de {total} de la lista. Lo que marques se usa en todos los "
+                             f"videos (el mismo idioma o su variante).")
+                self._subs_estado("Elige los idiomas en la ventana…", "cyan")
+                elegidos = self._en_ui_espera(self._subs_elegir_idiomas, v)
+                if elegidos == "letra":
+                    return "letra"
+                if not elegidos:
+                    self._subs_log("⏹ Cancelado: no se eligió ningún idioma.")
+                    self._subs_estado("Cancelado", "orange")
+                    return None
+                eleccion = [(lang, dic) for _, lang, dic, _ in elegidos]
+                self._subs_log("   · Para toda la lista: " + ", ".join(et.split(" · ")[0] for et, *_ in elegidos))
+            else:
+                elegidos = self._subs_equivalentes_lista(eleccion, v["opciones"])
+                if not elegidos:
+                    sin_subs += 1
+                    self._subs_log("   ⚠️ No tiene subtítulos en esos idiomas.")
+                    continue
+            hechos = 0
+            for j, (etiqueta, lang, dic, auto) in enumerate(elegidos):
+                if getattr(self, "_subs_detener", False):
+                    break
+                try:
+                    ruta, n = self._subs_bajar_uno(v, p2, lang, dic, auto)
+                except Exception as ex:
+                    self._subs_log(f"   ❌ {etiqueta.split(' · ')[0]}: {self._subs_texto_error(ex)}")
+                    continue
+                hechos += 1
+                self._subs_log(f"   ✅ {os.path.basename(ruta)}  ({n} líneas)")
+                if j + 1 < len(elegidos):
+                    time.sleep(0.4)
+            archivos += hechos
+            if hechos:
+                videos_ok += 1
+            else:
+                errores += 1
+        self._subs_ultima_carpeta = destino
+        partes = [f"{videos_ok}/{total} videos con subtítulos ({archivos} archivo{'s' if archivos != 1 else ''})"]
+        if sin_subs:
+            partes.append(f"{sin_subs} sin subtítulos")
+        if errores:
+            partes.append(f"{errores} con error")
+        if detenido:
+            msg, color = "⏹ Detenido: " + " · ".join(partes) + ".", "#f39c12"
+        elif videos_ok == total:
+            msg, color = "🏁 Terminado: " + " · ".join(partes) + ".", None
+        elif videos_ok:
+            msg, color = "🏁 Terminado: " + " · ".join(partes) + ".", "#f1c40f"
+        else:
+            msg, color = "🏁 Terminado: no se guardó ningún subtítulo (" + " · ".join(partes[1:] or ["0"]) + ").", "#e74c3c"
+        self._subs_log(msg, color)
+        self._subs_estado(msg.replace("🏁 ", "✅ " if videos_ok == total else "⚠️ "), color or "#2ecc71")
+        return None
+
+    def _subs_resumen_video(self, a):
+        """(Hilo de trabajo) Qué subtítulos tiene el video; los idiomas se eligen en la ventana."""
+        self._subs_log(f"🎬 {a['titulo']}")
+        opciones = a["opciones"]
+        if not opciones:
+            self._subs_log("   ⚠️ Este video no tiene subtítulos (ni automáticos).")
+            c = (a.get("canciones") or [{}])[0]
+            if c.get("titulo"):
+                self._subs_log(f"   · Si es una canción ({c.get('artista') or '?'} — {c['titulo']}), "
+                               f"usa «🎵 Letra de canción».")
+            return
+        subidos = sum(1 for *_, auto in opciones if not auto)
+        automaticos = len(opciones) - subidos
+        partes = []
+        if subidos:
+            partes.append(f"{subidos} subido{'s' if subidos != 1 else ''} por el autor")
+        if automaticos:
+            partes.append(f"{automaticos} automático{'s' if automaticos != 1 else ''}")
+        self._subs_log("   · Subtítulos: " + ", ".join(partes))
+
+    def _subs_elegir_idiomas(self, a):
+        """
+        (Hilo de la interfaz) Ventana para marcar qué subtítulos bajar. Devuelve
+        las opciones elegidas, [] si se cancela o "letra" para bajar la letra.
+        """
+        opciones = a["opciones"]
+        c_main = getattr(self, "_subs_c_main", "#8e44ad")
+        c_hover = getattr(self, "_subs_c_hover", "#732d91")
+        # Marcados de entrada: los de la última vez; si no, español, inglés o el primero
+        previos = getattr(self, "_subs_ultimos_idiomas", set())
+        marcar = {lang for _, lang, _, _ in opciones if lang in previos}
+        if not marcar:
+            for base in ("es", "en"):
+                lang = next((l for _, l, _, auto in opciones if not auto and _subs_idioma_base(l) == base), None)
+                if lang:
+                    marcar = {lang}
+                    break
+            else:
+                marcar = {opciones[0][1]}
+        filas, grupo = [], None
+        for op in opciones:
+            etiqueta, lang, dic, auto = op
+            titulo_grupo = ("Automáticos (idioma original del video)" if dic == "automatic_captions"
+                            else "Automáticos de TikTok" if auto else "Subidos por el autor")
+            if titulo_grupo != grupo:
+                grupo = titulo_grupo
+                filas.append((grupo, None, None))
+            filas.append((etiqueta.split(" · ")[0], op, lang in marcar))
+        res, _ = self._dialogo_listas(
+            titulo_ventana="Elegir subtítulos", titulo="💬  Elige los subtítulos",
+            subtitulo=a.get("titulo") or "",
+            texto=a.get("nota") or "Marca uno o varios idiomas: se guarda un archivo por idioma.",
+            secciones=[{"filas": filas, "multiple": True, "minimo": 1,
+                        "aviso_minimo": "Marca al menos un idioma.",
+                        "rapidos": [("Todos", lambda v: True), ("Ninguno", lambda v: False)],
+                        "extra": ("🎵 Es una canción: bajar la letra", "letra")}],
+            texto_aceptar="⬇ Descargar", color=c_main, color_hover=c_hover, texto_cancelar="Cancelar")
+        if res == "letra":
+            return "letra"
+        if not isinstance(res, list):
+            return []
+        elegidos = res[0]
+        self._subs_ultimos_idiomas = {op[1] for op in elegidos}
+        return elegidos
+
+    def _subs_bajar_uno(self, a, p, lang, dic, auto):
+        """Baja UN idioma de subtítulos y lo guarda en el formato elegido. Devuelve (ruta, líneas)."""
+        import copy
+        carpeta_tmp = tempfile.mkdtemp(prefix="subs_")
+        try:
+            opts = {"skip_download": True, "quiet": True, "no_warnings": True, "noplaylist": True,
+                    "ignore_no_formats_error": True, "format": "bv*+ba/b/bv/ba/best",
+                    "writesubtitles": dic == "subtitles", "writeautomaticsub": dic == "automatic_captions",
+                    "subtitleslangs": [re.escape(lang)], "subtitlesformat": "srv1/vtt/srt/ttml/best",
+                    "outtmpl": os.path.join(carpeta_tmp, "sub.%(ext)s"), "socket_timeout": 20}
+            opts.update(_yt_opts_robustos())
+            with yt_dlp.YoutubeDL(opts) as ydl:
+                if a.get("info") is not None:
+                    ydl.process_ie_result(copy.deepcopy(a["info"]), download=True)
+                else:
+                    ydl.download([a["url"]])
+            archivos = sorted(os.path.join(carpeta_tmp, f) for f in os.listdir(carpeta_tmp)
+                              if f.startswith("sub.") and os.path.splitext(f)[1].lower() in _SUBS_EXTS)
+            if not archivos:
+                raise RuntimeError("El sitio no entregó el archivo de subtítulos (prueba de nuevo en un rato).")
+            cues = _subs_leer(archivos[0])
+            if not cues:
+                raise RuntimeError("El archivo de subtítulos vino vacío.")
+            cues = _subs_colores(cues, p.get("colores", "original"), continuo=p["formato"] == ".txt")
+            destino = p["destino"]
+            os.makedirs(destino, exist_ok=True)
+            nombre = f"{self._subs_nombre_archivo(a['titulo'])} [{lang.replace('-orig', '')}]"
+            ruta = _ruta_unica(os.path.join(destino, nombre + p["formato"]))
+            return ruta, _subs_escribir(cues, p["formato"], ruta, automaticos=auto)
+        finally:
+            shutil.rmtree(carpeta_tmp, ignore_errors=True)
+
+    def _subs_bajar_subtitulos(self, a, p, elegidos):
+        total, guardados, detenido = len(elegidos), 0, False
+        for i, (etiqueta, lang, dic, auto) in enumerate(elegidos, start=1):
+            if getattr(self, "_subs_detener", False):
+                detenido = True
+                break
+            self._subs_estado(f"⬇️ ({i}/{total}) Subtítulos: {etiqueta[:70]}", "cyan")
+            self._subs_log(f"💬 [{i}/{total}] {etiqueta}")
+            try:
+                ruta, n = self._subs_bajar_uno(a, p, lang, dic, auto)
+            except Exception as e:
+                self._subs_log(f"   ❌ {self._subs_texto_error(e)}")
+                continue
+            guardados += 1
+            self._subs_log(f"   ✅ {os.path.basename(ruta)}  ({n} líneas)")
+            if i < total:
+                time.sleep(0.4)             # sin apurar a YouTube (evita el HTTP 429)
+        self._subs_ultima_carpeta = p["destino"]
+        s = "s" if total != 1 else ""
+        if detenido:
+            msg, color = f"⏹ Detenido por el usuario: {guardados}/{total} subtítulo{s} guardado{s}.", "#f39c12"
+        elif guardados == total:
+            msg, color = f"🏁 Terminado: {guardados}/{total} subtítulo{s} guardado{s} con éxito.", None
+        elif guardados:
+            msg, color = (f"🏁 Terminado: {guardados}/{total} subtítulos guardados "
+                          f"({total - guardados} con error).", "#f1c40f")
+        else:
+            msg, color = f"🏁 Terminado: no se pudo guardar ningún subtítulo (0/{total}).", "#e74c3c"
+        self._subs_log(msg, color)
+        self._subs_estado(msg.replace("🏁 ", "✅ " if guardados == total else "⚠️ "), color or "#2ecc71")
+
+    def _subs_bajar_letras(self, a, p):
+        canciones = [c for c in a["canciones"] if c.get("titulo")]
+        if not canciones:
+            raise RuntimeError("No se pudo saber qué canción es (falta el título).")
+        total = len(canciones)
+        if a["spotify"] or total > 1:
+            origen = "Spotify" if a["spotify"] else "Lista"
+            self._subs_log(f"🎵 {origen}: {total} canci{'ones' if total != 1 else 'ón'}")
+            for c in canciones[:10]:
+                dur = f" ({int(c['duracion']) // 60}:{int(c['duracion']) % 60:02})" if c.get("duracion") else ""
+                self._subs_log(f"   · {c['artista']} — {c['titulo']}{dur}")
+            if total > 10:
+                self._subs_log(f"   · … y {total - 10} más")
+        elif a.get("titulo"):
+            self._subs_log(f"🎬 {a['titulo']}")
+        destino = p["destino"]
+        if total > 1:
+            lista = canciones[0].get("lista") or "Spotify"
+            destino = os.path.join(destino, self._subs_nombre_archivo(f"Letras - {lista}"))
+        os.makedirs(destino, exist_ok=True)
+        guardadas, sin_tiempos, detenido = 0, 0, False
+        for i, c in enumerate(canciones, start=1):
+            if getattr(self, "_subs_detener", False) or not self._subs_seguir_tanda(i - 1, total, "canciones"):
+                detenido = True
+                break
+            if i > 1:
+                self._subs_pausa_lista(1, 2.5)      # sin saturar a los proveedores de letras
+                if getattr(self, "_subs_detener", False):
+                    detenido = True
+                    break
+            nombre = f"{c['artista']} - {c['titulo']}" if c.get("artista") else c["titulo"]
+            self._subs_estado(f"🎵 ({i}/{total}) Buscando letra: {nombre[:60]}", "cyan")
+            self._subs_log(f"🎵 [{i}/{total}] {nombre}")
+            r = _buscar_letra(c, p["con_tiempos"], log=self._subs_log)
+            if not r:
+                self._subs_log("   ⚠️ No se encontró la letra en ninguna fuente.")
+                continue
+            texto, ext, con_tiempos = _letra_texto_final(r, c, p["con_tiempos"])
+            ruta = _ruta_unica(os.path.join(destino, self._subs_nombre_archivo(nombre, "letra") + ext))
+            with open(ruta, "w", encoding="utf-8") as fh:
+                fh.write(texto)
+            guardadas += 1
+            nota = ""
+            if p["con_tiempos"] and not con_tiempos:
+                sin_tiempos += 1
+                nota = " — no hay versión con tiempos: se guardó solo la letra"
+            self._subs_log(f"   ✅ {os.path.basename(ruta)}  (fuente: {r.get('fuente')}){nota}")
+        self._subs_ultima_carpeta = destino
+        s = "s" if total != 1 else ""
+        if detenido:
+            msg, color = (f"⏹ Detenido: {guardadas}/{total} letra{s} "
+                          f"guardada{'s' if guardadas != 1 else ''}."), "#f39c12"
+        elif guardadas == total:
+            msg, color = f"🏁 Terminado: {guardadas}/{total} letra{s} guardada{s} con éxito.", None
+        elif guardadas:
+            msg, color = (f"🏁 Terminado: {guardadas}/{total} letras guardadas "
+                          f"({total - guardadas} sin letra)."), "#f1c40f"
+        else:
+            msg, color = f"🏁 Terminado: no se encontró la letra (0/{total}).", "#f39c12"
+        if sin_tiempos and guardadas:
+            msg += f" {sin_tiempos} sin versión con tiempos (solo la letra)."
+        self._subs_log(msg, color)
+        self._subs_estado(msg.replace("🏁 ", "✅ " if guardadas == total else "⚠️ "), color or "#2ecc71")
+
+    def _trans_guardar_rapido(self):
+        self._config_guardar(trans_rapido=bool(self.trans_rapido_var.get()))
+
+    @staticmethod
+    def _trans_texto_modo(rapido):
+        """Línea del registro que dice si se transcribe en ⚡ Modo rápido o en el normal."""
+        return ("⚡ Modo rápido: ACTIVADO (transcribe varios trozos a la vez)" if rapido
+                else "🐢 Modo rápido: desactivado (modo normal)")
+
+    @staticmethod
+    def _reloj_texto(segundos):
+        s = int(max(segundos, 0))
+        return f"{s // 3600:02}:{(s % 3600) // 60:02}:{s % 60:02}"
+
+    def _yt_reloj_iniciar(self):
+        """(Hilo de la interfaz) Reloj de YouTube → Texto, como el de Archivos."""
+        self._yt_reloj_gen = getattr(self, "_yt_reloj_gen", 0) + 1
+        self._yt_reloj_t0 = time.time()
+        try:
+            self.yt_trans_time_lbl.configure(text="⏱️ 00:00:00", text_color="#d4ac0d")
+        except Exception:
+            return
+        self._yt_reloj_tick(self._yt_reloj_gen)
+
+    def _yt_reloj_tick(self, gen):
+        t0 = getattr(self, "_yt_reloj_t0", None)
+        if gen != getattr(self, "_yt_reloj_gen", 0) or t0 is None:
+            return
+        try:
+            self.yt_trans_time_lbl.configure(text="⏱️ " + self._reloj_texto(time.time() - t0))
+        except Exception:
+            return
+        self.after(1000, lambda: self._yt_reloj_tick(gen))
+
+    def _yt_reloj_parar(self):
+        """(Hilo de la interfaz) Deja el tiempo total en verde."""
+        t0 = getattr(self, "_yt_reloj_t0", None)
+        if t0 is None:
+            return
+        self._yt_reloj_t0 = None
+        try:
+            self.yt_trans_time_lbl.configure(text="⏱️ Total: " + self._reloj_texto(time.time() - t0),
+                                             text_color="#2cc985")
+        except Exception:
+            pass
+
     # --- LÓGICA DE YOUTUBE → TRANSCRIBIR ---
 
     def start_yt_transcribe(self):
@@ -14639,6 +17863,7 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
         self.yt_trans_log.configure(state="normal")
         self.yt_trans_log.delete("1.0", "end")
         self.yt_trans_log.configure(state="disabled")
+        self._yt_reloj_iniciar()
 
         threading.Thread(target=self._yt_trans_worker, args=(url,), daemon=True).start()
 
@@ -14667,6 +17892,7 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
             self._yt_trans_ocupado = False
             self._en_ui(self.yt_trans_btn.configure, state="normal")
             self._en_ui(self.yt_trans_cancel_btn.configure, state="disabled")
+            self._en_ui(self._yt_reloj_parar)
 
     @staticmethod
     def _yt_trans_localizar(info, tmp_dir, tmp_id):
@@ -14710,8 +17936,10 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
             encontrados.discard(os.path.abspath(actual))
         return sorted(encontrados)
 
-    def run_yt_transcribe(self, url):
+    def run_yt_transcribe(self, url, titulo_forzado=None):
         """
+        titulo_forzado: nombre del archivo de salida (lo usa Spotify → Texto, que
+        llega aquí con el enlace de YouTube que encontró spotDL para la canción).
         Flujo completo:
           1. Descargar el audio en su MEJOR formato original (opus/m4a), sin convertir
           2. Leerlo a memoria (16 kHz mono) con ffmpeg — sin WAV intermedio
@@ -14724,13 +17952,10 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
         audio     = None
         out_path  = ""
 
-        def _log(msg, color="#e0e0e0"):
-            def _do():
-                self.yt_trans_log.configure(state="normal")
-                self.yt_trans_log.insert("end", msg + "\n")
-                self.yt_trans_log.see("end")
-                self.yt_trans_log.configure(state="disabled")
-            self.after(0, _do)
+        def _log(msg, color=None):
+            # Con color según el tipo de mensaje (✅ verde, ❌ rojo, ⚠️ naranja…)
+            self._en_ui(self._log_en_caja, self.yt_trans_log, msg,
+                        None if color in (None, "#e0e0e0") else color)
 
         def _status(msg, color="white", pct=None):
             self.after(0, lambda: self.yt_trans_status.configure(
@@ -14739,6 +17964,22 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
                 self.after(0, lambda p=pct: self.yt_trans_progress.set(p))
 
         try:
+            # Deno: yt-dlp lo necesita para los retos de YouTube (también cuando
+            # spotDL busca las canciones ahí). Si falta se baja UNA vez, igual que
+            # en el descargador (antes aquí nunca se descargaba).
+            if titulo_forzado is None:
+                try:
+                    asegurar_deno_disponible(
+                        status_cb=lambda m: (_status(m, "#aaaaff"), _log(f"🦕 {m}")))
+                except Exception as _deno_e:
+                    print(f"[YT-Texto] asegurar_deno_disponible no crítico: {_deno_e}")
+
+            # Spotify: yt-dlp no puede con Spotify (DRM). spotDL busca cada
+            # canción en YouTube y desde ahí se transcribe.
+            if titulo_forzado is None and es_url_spotify(url):
+                self._trans_spotify(url, _log, _status)
+                return
+
             # ── PRE-PASO: DETECCIÓN DE PLAYLIST / MIX ────────────────────
             _status("🔍 Analizando URL...", "cyan", 0.02)
             _log("📡 Analizando URL...")
@@ -14766,6 +18007,7 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
                     'extract_flat': True, 'socket_timeout': 15,
                     'subprocess_creationflags': subprocess.CREATE_NO_WINDOW,
                 }
+                _pl_opts.update(_yt_opts_robustos())
                 try:
                     with yt_dlp.YoutubeDL(_pl_opts) as _ydl_pl:
                         _pl_info = _ydl_pl.extract_info(_pl_url, download=False)
@@ -14784,6 +18026,7 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
                         'dest_path': getattr(self, 'yt_custom_dest_path', ''),
                         'idioma':    TRANS_IDIOMAS.get(self.yt_trans_lang_var.get()),
                         'tarea':     "translate" if self.yt_trans_traducir_var.get() else "transcribe",
+                        'rapido':    bool(self.trans_rapido_var.get()),
                     }
                     self.run_yt_transcribe_playlist(
                         url, _pl_entries, _pl_title_raw, _pl_cfg, _log, _status)
@@ -14802,7 +18045,7 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
             tmp_id  = uuid.uuid4().hex[:10]
 
             ydl_opts = {
-                'format':      'bestaudio/best',
+                'format':      _yt_formato_audio(url),
                 'quiet':       True,
                 'no_warnings': True,
                 'noplaylist':  True,   # siempre un solo video en esta rama
@@ -14811,10 +18054,13 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
                 # Sin postprocesador: se guarda el mejor audio TAL CUAL (opus/m4a).
                 # Nada de WAV pesado; ffmpeg lo lee directo a memoria después.
             }
+            ydl_opts.update(_yt_opts_robustos())      # Deno para los retos de YouTube
 
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(url, download=True)
+                info = _yt_extraer_bajar(ydl, url, solo_audio=True)
                 title = info.get('title', 'Sin título')[:60] if info else 'Sin título'
+            if titulo_forzado:
+                title = titulo_forzado[:60]
 
             _log(f"✅ Descargado: {title}")
             _status("🔊 Preparando audio para Whisper...", "#3498db", 0.30)
@@ -14841,6 +18087,7 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
             use_gpu      = self.yt_trans_use_gpu.get()          # FIX 2a: usar var propia del tab YT
             idioma       = TRANS_IDIOMAS.get(self.yt_trans_lang_var.get())      # None = automático
             tarea        = "translate" if self.yt_trans_traducir_var.get() else "transcribe"
+            rapido       = bool(self.trans_rapido_var.get())
             device       = "cuda" if use_gpu and torch.cuda.is_available() else "cpu"
             compute_type = "int8_float16" if device == "cuda" else "int8"
             current_cfg  = (model_size, device)
@@ -14904,10 +18151,11 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
             # ── PASO 4: TRANSCRIBIR ───────────────────────────────────────
             _status("🎙️  Transcribiendo...", "#2cc985", 0.55)
             _log("🎙️  Iniciando Whisper...")
+            _log(self._trans_texto_modo(rapido))
 
             total_dur = (audio.shape[0] / WHISPER_SR) or 1
             segments, info_w = _transcribe_safe(
-                self.faster_model, audio,
+                self.faster_model, audio, rapido=rapido,
                 beam_size=5, **_trans_opts_idioma(idioma), task=tarea,
                 condition_on_previous_text=True,
                 vad_filter=True,
@@ -14982,6 +18230,76 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
 
             self.after(0, lambda: self.yt_trans_btn.configure(state="normal"))
             self.after(0, lambda: self.yt_trans_cancel_btn.configure(state="disabled"))
+
+    def _trans_spotify(self, url, _log, _status):
+        """
+        Spotify → Texto. yt-dlp no puede bajar de Spotify (DRM): spotDL busca cada
+        canción en YouTube (sin bajar nada todavía) y con ese enlace se sigue el
+        camino normal: una canción = transcripción suelta; álbum o playlist =
+        igual que una playlist de YouTube (subcarpeta y modelo cargado una vez).
+        """
+        _status("🎵 Preparando spotDL...", "cyan", 0.02)
+        _log("🎵 Enlace de Spotify: spotDL busca cada canción en YouTube...")
+        if not asegurar_spotdl_disponible(status_cb=lambda m: _log(f"   {m}")):
+            _status("❌ spotDL no disponible", "red", 0)
+            _log("❌ spotDL no está disponible en esta instalación.", "#e74c3c")
+            return
+
+        _status("🔍 Buscando las canciones en YouTube...", "cyan", 0.04)
+        base_args = ["--audio", "youtube", "--max-retries", "1",
+                     "--simple-tui", "--log-level", "INFO"]
+        carpeta_tmp = tempfile.mkdtemp(prefix="sp_trans_")
+        try:
+            canciones = _spotdl_listar(url, base_args,
+                                       debe_parar=lambda: self.cancel_requested,
+                                       carpeta_tmp=carpeta_tmp, extra=["--preload"])
+        except _YtDetenido:
+            _status("❌ Cancelado por el usuario", "#e74c3c", 0)
+            _log("🚫 Cancelado por el usuario.", "#f39c12")
+            return
+        finally:
+            shutil.rmtree(carpeta_tmp, ignore_errors=True)
+
+        def _nombre(c):
+            art = c.get("artist") or (c.get("artists") or [""])[0] or ""
+            tit = c.get("name") or c.get("title") or "Canción"
+            return f"{art} - {tit}".strip(" -")
+
+        if not canciones:
+            _status("❌ No se pudo leer el enlace de Spotify", "red", 0)
+            _log("❌ spotDL no pudo leer el enlace (¿es de una canción, álbum o playlist? "
+                 "¿hay conexión?).", "#e74c3c")
+            return
+        entradas = [{"url": c["download_url"], "title": _nombre(c)}
+                    for c in canciones if c.get("download_url")]
+        if not entradas:
+            _status("❌ No se encontró en YouTube", "red", 0)
+            _log("❌ spotDL no encontró esas canciones en YouTube.", "#e74c3c")
+            return
+        sin_match = len(canciones) - len(entradas)
+        if sin_match:
+            _log(f"⚠️  {sin_match} canción(es) sin coincidencia en YouTube: se omiten.")
+
+        if len(entradas) == 1:
+            _log(f"🎵 {entradas[0]['title']}  →  {entradas[0]['url']}")
+            self.run_yt_transcribe(entradas[0]["url"], titulo_forzado=entradas[0]["title"])
+            return
+
+        tipo = "Álbum" if "/album/" in url.lower() else "Playlist"
+        nombre_lista = (canciones[0].get("list_name") or canciones[0].get("album_name")
+                        or "Spotify")
+        cfg = {
+            'raw_model': self.yt_trans_model_var.get(),
+            'use_gpu':   self.yt_trans_use_gpu.get(),
+            'fmt':       self.yt_trans_fmt_var.get(),
+            'dest_val':  self.yt_trans_dest_var.get(),
+            'dest_path': getattr(self, 'yt_custom_dest_path', ''),
+            'idioma':    TRANS_IDIOMAS.get(self.yt_trans_lang_var.get()),
+            'tarea':     "translate" if self.yt_trans_traducir_var.get() else "transcribe",
+            'rapido':    bool(self.trans_rapido_var.get()),
+        }
+        self.run_yt_transcribe_playlist(url, entradas, f"{tipo} - {nombre_lista}", cfg,
+                                        _log, _status)
 
     # =========================================================================
     # PLAYLIST TRANSCRIPCIÓN
@@ -15089,6 +18407,7 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
             # --- 4. LOOP DE ITEMS ---
             done_count = 0
             _log(f"\n📋 Iniciando transcripción de playlist: {safe_pl}")
+            _log(f"   {self._trans_texto_modo(cfg.get('rapido', False))}")
             _log(f"   Total: {total} videos  |  Destino: {pl_folder}\n")
 
             for i, entry in enumerate(entries):
@@ -15121,6 +18440,7 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
                     fmt            = cfg['fmt'],
                     idioma         = cfg.get('idioma'),
                     tarea          = cfg.get('tarea', "transcribe"),
+                    rapido         = cfg.get('rapido', False),
                     _log           = _log,
                     _status        = _status,
                 )
@@ -15173,7 +18493,8 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
     # -------------------------------------------------------------------------
 
     def _trans_un_item(self, item_url, item_title_raw, item_index,
-                        out_folder, fmt, _log, _status, idioma=None, tarea="transcribe"):
+                        out_folder, fmt, _log, _status, idioma=None, tarea="transcribe",
+                        rapido=False):
         """
         Descarga (mejor audio original), lee a memoria y transcribe un video de la playlist.
         Usa self.faster_model (ya cargado). Devuelve True si OK, False si falló.
@@ -15187,15 +18508,16 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
             tmp_id  = uuid.uuid4().hex[:10]
 
             ydl_opts = {
-                'format':      'bestaudio/best',
+                'format':      _yt_formato_audio(item_url),
                 'quiet':       True,
                 'no_warnings': True,
                 'noplaylist':  True,
                 'outtmpl':     os.path.join(tmp_dir, f"yt_trans_{tmp_id}.%(ext)s"),
                 'subprocess_creationflags': subprocess.CREATE_NO_WINDOW,
             }
+            ydl_opts.update(_yt_opts_robustos())      # Deno para los retos de YouTube
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info_item = ydl.extract_info(item_url, download=True)
+                info_item = _yt_extraer_bajar(ydl, item_url, solo_audio=True)
 
             tmp_audio = self._yt_trans_localizar(info_item, tmp_dir, tmp_id)
             if not tmp_audio:
@@ -15214,7 +18536,7 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
 
             # -- Transcribir con modelo ya cargado --
             segments, info_w = _transcribe_safe(
-                self.faster_model, audio,
+                self.faster_model, audio, rapido=rapido,
                 beam_size=5, **_trans_opts_idioma(idioma), task=tarea,
                 condition_on_previous_text=True,
                 vad_filter=True,
@@ -15716,7 +19038,208 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
 
         return False
 
-    def _whisper_decodificar(self, ruta):
+    # ------------------------------------------------------------------
+    #   ARCHIVOS CON VARIAS PISTAS DE AUDIO (películas, videos doblados)
+    # ------------------------------------------------------------------
+    _PISTAS_TEXTOS = {
+        "transcribe": ("🎙️  ¿Qué pista transcribir?",
+                       "Este archivo tiene {n} pistas de audio. Elige cuál transcribir."),
+        "extract": ("🎵  ¿Qué pistas extraer?",
+                    "Este video tiene {n} pistas de audio. Marca una o varias: se guarda "
+                    "un archivo por pista."),
+    }
+
+    @staticmethod
+    def _pista_texto(i, a):
+        """'Pista 2 · Español · AAC 5.1 · Doblaje' para las ventanas de elección."""
+        canales = {1: "mono", 2: "estéreo", 6: "5.1", 8: "7.1"}.get(
+            a.get("canales"), f"{a.get('canales')} canales" if a.get("canales") else "")
+        partes = [f"Pista {i + 1}", _idioma_nombre(a.get("idioma"))]
+        tecnico = " ".join(x for x in ((a.get("codec") or "").upper(), canales) if x)
+        if tecnico:
+            partes.append(tecnico)
+        if a.get("titulo"):
+            partes.append(str(a["titulo"])[:40])
+        if a.get("defecto"):
+            partes.append("predeterminada")
+        return " · ".join(partes)
+
+    def _elegir_pistas_audio(self, ruta, audios, multiple, contexto):
+        """
+        (Hilo de la interfaz) Ventana para elegir la(s) pista(s) de audio.
+        Devuelve (índices elegidos o None si se omite el archivo, ¿usar lo mismo
+        en los demás archivos de la lista?).
+        """
+        titulo, texto = self._PISTAS_TEXTOS[contexto]
+        pre = next((i for i, a in enumerate(audios) if a.get("defecto")), 0)
+        filas = [(self._pista_texto(i, a), i, (i == pre) if (contexto == "extract" or not multiple) else True)
+                 for i, a in enumerate(audios)]
+        # Hay que quedarse con una como mínimo: en vez de "Ninguna", "Principal"
+        rapidos = ([("Todas", lambda v: True)] if multiple else []) + [("Principal", lambda v: v == pre)]
+        res, recordar = self._dialogo_listas(
+            titulo_ventana="Pistas de audio", titulo=titulo, subtitulo=os.path.basename(ruta),
+            texto=texto.format(n=len(audios)),
+            secciones=[{"filas": filas, "multiple": multiple, "minimo": 1, "rapidos": rapidos,
+                        "aviso_minimo": "Marca al menos una pista."}],
+            color_titulo="#e0e0e0", texto_cancelar="Omitir este archivo",
+            texto_recordar="Usar la misma elección en los demás archivos de esta lista")
+        return (res[0] if isinstance(res, list) else None), recordar
+
+    @staticmethod
+    def _pistas_equivalentes(recuerdo, audios, multiple):
+        """La elección recordada aplicada a otro archivo: por idioma si lo hay; si no, por número."""
+        idiomas = [str(a.get("idioma") or "").lower() for a in audios]
+        elegidas = []
+        for i, idioma in recuerdo:
+            idioma = str(idioma or "").lower()
+            if idioma and idioma != "und" and idioma in idiomas:
+                j = idiomas.index(idioma)
+            elif i < len(audios):
+                j = i
+            else:
+                continue
+            if j not in elegidas:
+                elegidas.append(j)
+        elegidas = elegidas or [0]
+        return elegidas if multiple else elegidas[:1]
+
+    _SUBS_CODEC_NOMBRE = {"subrip": "SRT", "srt": "SRT", "ass": "ASS", "ssa": "SSA", "mov_text": "texto",
+                          "webvtt": "WebVTT", "text": "texto", "hdmv_pgs_subtitle": "PGS (imagen)",
+                          "dvd_subtitle": "DVD (imagen)", "dvb_subtitle": "DVB (imagen)"}
+
+    @classmethod
+    def _sub_texto(cls, k, s):
+        """'Subtítulo 2 · Español · SRT · forzado' para las ventanas de elección."""
+        partes = [f"Subtítulo {k + 1}", _idioma_nombre(s.get("idioma"))]
+        codec = cls._SUBS_CODEC_NOMBRE.get(s.get("codec"), str(s.get("codec") or "").upper())
+        if codec:
+            partes.append(codec)
+        if s.get("forzado"):
+            partes.append("forzado")
+        if s.get("titulo"):
+            partes.append(str(s["titulo"])[:40])
+        if s.get("defecto"):
+            partes.append("predeterminado")
+        return " · ".join(partes)
+
+    def _elegir_pistas_subs_video(self, ruta, audios, subs, compat, contexto, ext, principal):
+        """
+        (Hilo de la interfaz) Convertir / Reducir tamaño: qué pistas de audio y qué
+        subtítulos conservar. audios: [] si no hay audio que elegir; subs: todos los
+        subtítulos del archivo; compat: los que caben en el formato de salida.
+        Devuelve ({"audio": índices | None, "subs": índices}, ¿recordar?) o
+        (None, False) si se omite el archivo.
+        """
+        reducir = contexto == "compress"
+        secciones = []
+        if audios:
+            secciones.append({
+                "titulo": f"🔊  Pistas de audio ({len(audios)})",
+                "filas": [(self._pista_texto(i, a), i, (i == principal) if reducir else True)
+                          for i, a in enumerate(audios)],
+                "multiple": True, "minimo": 1, "aviso_minimo": "Marca al menos una pista de audio.",
+                # hay que quedarse con una como mínimo: en vez de "Ninguna", "Principal"
+                "rapidos": [("Todas", lambda v: True), ("Principal", lambda v: v == principal)]})
+        if compat:
+            fuera = len(subs) - len(compat)
+            secciones.append({
+                "titulo": f"💬  Subtítulos ({len(compat)})",
+                "filas": [(self._sub_texto(k, subs[k]), k, not reducir) for k in compat],
+                "multiple": True, "minimo": 0,
+                "rapidos": [("Todos", lambda v: True), ("Ninguno", lambda v: False)],
+                "nota": (f"{fuera} subtítulo{'s' if fuera > 1 else ''} de imagen (PGS/DVD) no "
+                         f"cabe{'n' if fuera > 1 else ''} en .{ext}: solo en MKV.") if fuera else None})
+        if reducir:
+            texto = ("Para que pese menos, de entrada queda solo el audio principal y sin subtítulos. "
+                     "Marca lo que quieras conservar.")
+        else:
+            texto = "Marca las pistas de audio y los subtítulos que quieres en el video convertido."
+        if subs and not compat:
+            texto += f" El formato .{ext} no guarda subtítulos."
+        elif compat and ext in ("mp4", "mov"):
+            texto += " Los subtítulos quedan como pistas que se activan en el reproductor."
+        color, hover = ("#2cc985", "#25a86f") if reducir else ("#1f6aa5", "#18537f")
+        res, recordar = self._dialogo_listas(
+            titulo_ventana="Pistas y subtítulos",
+            titulo="🎬  ¿Qué quieres conservar?", color_titulo="#e0e0e0",
+            subtitulo=os.path.basename(ruta), texto=texto, secciones=secciones,
+            color=color, color_hover=hover, texto_cancelar="Omitir este archivo",
+            texto_recordar="Usar la misma elección en los demás archivos de esta lista")
+        if not isinstance(res, list):
+            return None, False
+        salida = {"audio": res[0] if audios else None, "subs": res[-1] if compat else []}
+        return salida, recordar
+
+    @staticmethod
+    def _subs_equivalentes(recuerdo, subs, compat):
+        """Los subtítulos recordados aplicados a otro archivo: por idioma si lo hay; si no, por número."""
+        elegidos = []
+        for k0, idioma in recuerdo:
+            idioma = str(idioma or "").lower()
+            j = None
+            if idioma and idioma != "und":
+                j = next((k for k in compat if k not in elegidos
+                          and str(subs[k].get("idioma") or "").lower() == idioma), None)
+            if j is None and k0 in compat and k0 not in elegidos:
+                j = k0
+            if j is not None:
+                elegidos.append(j)
+        return elegidos
+
+    def _pistas_subs_para(self, ruta, audios, subs, compat, contexto, ext, principal):
+        """
+        (Hilo del lote) Convertir / Reducir tamaño: pistas de audio y subtítulos a
+        conservar ({"audio": índices | None, "subs": índices}) o None si se omite
+        el archivo. Con "usar la misma elección en los demás" no vuelve a preguntar
+        en este lote: busca lo mismo por idioma (o por número).
+        """
+        reducir = contexto == "compress"
+        lote = self._lote()
+        memoria = getattr(lote, "pistas_audio", None)
+        clave = f"video_{contexto}"
+        if isinstance(memoria, dict) and clave in memoria:
+            recuerdo = memoria[clave]
+            if not audios:
+                audio = None
+            elif recuerdo.get("audio") is None:        # el primero no tenía audio que elegir
+                audio = [principal] if reducir else list(range(len(audios)))
+            else:
+                audio = self._pistas_equivalentes(recuerdo["audio"], audios, True)
+            if recuerdo.get("subs") is None:           # el primero no tenía subtítulos
+                subs_el = [] if reducir else list(compat)
+            else:
+                subs_el = self._subs_equivalentes(recuerdo["subs"], subs, compat)
+            return {"audio": audio, "subs": subs_el}
+        eleccion, recordar = self._en_ui_espera(self._elegir_pistas_subs_video, ruta, audios, subs,
+                                                compat, contexto, ext, principal)
+        if eleccion is None:
+            return None
+        if recordar and isinstance(memoria, dict):
+            memoria[clave] = {
+                "audio": (None if eleccion["audio"] is None
+                          else [(i, audios[i].get("idioma")) for i in eleccion["audio"]]),
+                "subs": [(k, subs[k].get("idioma")) for k in eleccion["subs"]] if compat else None}
+        return eleccion
+
+    def _pistas_para(self, ruta, audios, contexto, multiple):
+        """
+        (Hilo del lote) Qué pista(s) de audio usar de un archivo que tiene varias.
+        Devuelve los índices (entre sus pistas de audio) o None si se omite el
+        archivo. Con "usar la misma elección en los demás" no vuelve a preguntar
+        en este lote: busca las mismas pistas por idioma (o por número).
+        """
+        lote = self._lote()
+        memoria = getattr(lote, "pistas_audio", None)
+        if memoria is None:
+            memoria = {}
+        if contexto in memoria:
+            return self._pistas_equivalentes(memoria[contexto], audios, multiple)
+        indices, recordar = self._en_ui_espera(self._elegir_pistas_audio, ruta, audios, multiple, contexto)
+        if indices and recordar and hasattr(lote, "pistas_audio"):
+            memoria[contexto] = [(i, audios[i].get("idioma")) for i in indices]
+        return indices
+
+    def _whisper_decodificar(self, ruta, pista=None):
         """
         Decodifica el audio de CUALQUIER archivo (audio o video) directo a memoria,
         en el formato exacto que Whisper usa por dentro: float32, 16 kHz, mono.
@@ -15726,11 +19249,14 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
         · Sin archivos temporales: FFmpeg escribe al pipe y aquí se arma el arreglo.
         · Corre en un proceso aparte (no compite con la interfaz) y se puede matar.
 
+        pista: índice de la pista de audio si el archivo tiene varias (None = la
+        que elige FFmpeg).
         Devuelve np.ndarray, o None si se canceló.
         Lanza RuntimeError con un mensaje claro si FFmpeg no puede leer el audio.
         """
         cmd = ["ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-threads", "0",
-               "-i", ruta, "-vn", "-sn", "-dn",
+               "-i", ruta, *(["-map", f"0:a:{int(pista)}"] if pista is not None else []),
+               "-vn", "-sn", "-dn",
                "-ac", "1", "-ar", str(WHISPER_SR),
                "-f", "f32le", "-acodec", "pcm_f32le", "pipe:1"]
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
@@ -15866,6 +19392,7 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
             use_gpu        = self.trans_use_gpu.get()
             idioma         = TRANS_IDIOMAS.get(self.trans_lang_var.get())     # None = automático
             tarea          = "translate" if self.trans_traducir_var.get() else "transcribe"
+            rapido         = bool(self.trans_rapido_var.get())
 
             model_size, local_path = self.get_local_model_path(raw_model_text)
 
@@ -15884,6 +19411,16 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
                 self.descargar_modelo_whisper()
                 time.sleep(0.3)
 
+            # Varias pistas de audio (películas, videos doblados): se pregunta cuál
+            # transcribir; con una sola, ni se pregunta
+            pista = None
+            audios = vid_info(source_path).get("audios") or []
+            if len(audios) >= 2:
+                elegidas = self._pistas_para(source_path, audios, "transcribe", multiple=False)
+                if not elegidas:
+                    return False, "⏭ Omitido (no se eligió pista de audio)"
+                pista = elegidas[0]
+
             # 2. LEER AUDIO A MEMORIA (ffmpeg → 16 kHz mono, sin WAV temporal)
             _ui(lambda: self.trans_status.configure(
                 text="🔊 Leyendo audio (ffmpeg)...", text_color="#3498db"))
@@ -15891,7 +19428,7 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
 
             # La decodificación corre en paralelo mientras verificamos/cargamos modelo
             with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
-                future_audio = executor.submit(self._whisper_decodificar, source_path)
+                future_audio = executor.submit(self._whisper_decodificar, source_path, pista)
 
                 # 3. CARGAR MODELO (si aún no está listo)
                 if getattr(self, 'faster_model', None) is None:
@@ -15988,7 +19525,7 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
             t_model_start = time.time()   # ← tiempo NETO del modelo
 
             segments, info = _transcribe_safe(
-                self.faster_model, audio,
+                self.faster_model, audio, rapido=rapido,
                 beam_size=5, **_trans_opts_idioma(idioma), task=tarea,
                 condition_on_previous_text=True,
                 vad_filter=True,
@@ -17335,12 +20872,14 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
         self.yt_cont_seg.pack(side="left", padx=10)
 
         # --- CHECKBOX: INCLUIR METADATOS ---
-        self.yt_metadata_var = ctk.BooleanVar(value=False)
+        # Se recuerda entre sesiones (config.json)
+        self.yt_metadata_var = ctk.BooleanVar(value=bool(self._config_leer().get("yt_metadatos", False)))
         self.yt_metadata_chk = ctk.CTkCheckBox(
             row2, text="Incluir Metadatos",
             variable=self.yt_metadata_var,
             fg_color="#444", hover_color="#555",
-            checkmark_color="white"
+            checkmark_color="white",
+            command=lambda: self._config_guardar(yt_metadatos=bool(self.yt_metadata_var.get()))
         )
         self.yt_metadata_chk.pack(side="left", padx=15)
         # ------------------------------------
@@ -17388,13 +20927,26 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
         )
         self.yt_upd_lbl.pack(side="left")
 
+        # --- CONFIGURACIÓN (se guarda en config.json, junto al tema) ---
+        _cfg = self._config_leer()
         self.yt_aviso_spotify_var = ctk.BooleanVar(
-            value=not self._config_leer().get("ocultar_aviso_spotify", False))
-        ctk.CTkCheckBox(
-            row_upd, text="Avisar al descargar de Spotify", variable=self.yt_aviso_spotify_var,
-            fg_color="#1DB954", hover_color="#17a34a", checkmark_color="white",
-            font=("Arial", 11), command=self._on_toggle_aviso_spotify
-        ).pack(side="right")
+            value=not _cfg.get("ocultar_aviso_spotify", False))
+        self.yt_codec_var = ctk.StringVar(
+            value=YT_CODECS.get(_cfg.get("yt_codec"), YT_CODECS["h264"]))
+        # Letra de la canción dentro del archivo (solo YouTube Music), apagada por defecto
+        self.yt_letras_var = ctk.BooleanVar(value=bool(_cfg.get("yt_letras", False)))
+        # Pista de audio: Original (por defecto) / Inglés / Español / Ambas / Preguntarme
+        _pistas = {"todas": "original"}.get(_cfg.get("yt_audio_pistas"), _cfg.get("yt_audio_pistas"))
+        self.yt_pistas_var = ctk.StringVar(
+            value=YT_PISTAS_AUDIO.get(_pistas, YT_PISTAS_AUDIO["original"]))
+        # Subtítulos: No (por defecto) / Español / Inglés / Ambos / Preguntarme
+        self.yt_subs_idiomas_var = ctk.StringVar(
+            value=YT_SUBS_IDIOMAS.get(_cfg.get("yt_subs_idiomas"), YT_SUBS_IDIOMAS["ambos"])
+            if _cfg.get("yt_subs", False) else YT_SUBS_IDIOMAS["no"])
+        # El resumen (códec · audio · subtítulos) se ve dentro de ⚙️ Configuración
+        ctk.CTkButton(row_upd, text="⚙️ Configuración", width=130, height=30,
+                      fg_color="#333", hover_color="#555",
+                      command=self._yt_abrir_configuracion).pack(side="right")
 
         # Chequeo silencioso en segundo plano al abrir el módulo
         threading.Thread(
@@ -17405,12 +20957,14 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
         global_frame = ctk.CTkFrame(self.yt_frame, fg_color="transparent")
         global_frame.pack(pady=5, padx=40)
         
-        self.yt_global_prog = ctk.CTkProgressBar(global_frame, height=10, width=717, progress_color=c_yt)
+        self.yt_global_prog = ctk.CTkProgressBar(global_frame, height=10, width=570, progress_color=c_yt)
         self.yt_global_prog.set(0)
         self.yt_global_prog.pack(side="left", padx=(0,10))
         
         ctk.CTkButton(global_frame, text="⛔ CANCELAR TODO", width=120, fg_color="#c92c2c", hover_color="#992222",
                       command=self.cancel_all_yt).pack(side="right")
+        ctk.CTkButton(global_frame, text="🧹 Limpiar terminadas", width=170, fg_color="#444",
+                      hover_color="#555", command=self._yt_limpiar_terminadas).pack(side="right", padx=(0, 8))
 
         # --- LISTA SCROLLABLE ---
         self.queue_scroll = ctk.CTkScrollableFrame(self.yt_frame, width=900, height=450, 
@@ -17447,7 +21001,7 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
         ctk.CTkCheckBox(cont, text="No volver a mostrar este aviso", variable=no_mostrar,
                         fg_color="#1DB954", hover_color="#17a34a", checkmark_color="white"
                         ).pack(anchor="w")
-        ctk.CTkLabel(cont, text="(Se puede volver a activar en YouTube Downloader)",
+        ctk.CTkLabel(cont, text="(Se puede volver a activar en YouTube Downloader → ⚙️ Configuración)",
                      font=("Arial", 10), text_color="#777").pack(anchor="w", padx=(28, 0))
 
         botones = ctk.CTkFrame(cont, fg_color="transparent")
@@ -17491,6 +21045,381 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
 
     def _on_toggle_aviso_spotify(self):
         self._config_guardar(ocultar_aviso_spotify=not bool(self.yt_aviso_spotify_var.get()))
+
+    # --- CONFIGURACIÓN DEL DESCARGADOR (config.json) ---
+    def _yt_cfg_codec(self):
+        """'h264' o 'h265'."""
+        etiqueta = self.yt_codec_var.get()
+        return next((k for k, v in YT_CODECS.items() if v == etiqueta), "h264")
+
+    def _yt_cfg_pistas(self):
+        """'original', 'en', 'es', 'ambas' o 'preguntar' (pista de audio)."""
+        etiqueta = self.yt_pistas_var.get() if hasattr(self, "yt_pistas_var") else ""
+        return next((k for k, v in YT_PISTAS_AUDIO.items() if v == etiqueta), "original")
+
+    def _yt_cfg_idiomas(self):
+        """'no', 'es', 'en', 'ambos' o 'preguntar'."""
+        etiqueta = self.yt_subs_idiomas_var.get()
+        return next((k for k, v in YT_SUBS_IDIOMAS.items() if v == etiqueta), "no")
+
+    def _yt_cfg_subs(self):
+        """None si no se incrustan subtítulos; si no, 'es', 'en', 'ambos' o 'preguntar'."""
+        clave = self._yt_cfg_idiomas()
+        return None if clave == "no" else clave
+
+    def _yt_cfg_guardar(self, *_):
+        clave = self._yt_cfg_idiomas()
+        extra = {"yt_subs_idiomas": clave} if clave != "no" else {}
+        self._config_guardar(yt_codec=self._yt_cfg_codec(),
+                             yt_audio_pistas=self._yt_cfg_pistas(),
+                             yt_subs=clave != "no", yt_letras=bool(self.yt_letras_var.get()), **extra)
+        self._yt_cfg_resumen()
+
+    def _yt_cfg_resumen(self):
+        """Resumen al pie de ⚙️ Configuración."""
+        codec = {"h264": "H.264", "h265": "H.265"}.get(self._yt_cfg_codec(), "H.264")
+        subs = {"es": "subtítulos ES", "en": "subtítulos EN", "ambos": "subtítulos ES + EN",
+                "preguntar": "subtítulos: preguntar"}.get(self._yt_cfg_subs(), "sin subtítulos")
+        lbl = getattr(self, "_yt_cfg_lbl_resumen", None)
+        if lbl is not None:
+            try:
+                letras = " · con letra" if self.yt_letras_var.get() else ""
+                audio = {"original": "audio original", "en": "audio en inglés",
+                         "es": "audio en español", "ambas": "audio ES + EN",
+                         "preguntar": "audio: preguntar"}.get(self._yt_cfg_pistas(), "audio original")
+                texto = f"Ahora: {codec} · {audio} · {subs}{letras}"
+                if lbl.cget("text") != texto:
+                    lbl.configure(text=texto)
+            except Exception:
+                pass
+
+    def _yt_abrir_configuracion(self, mostrar=True):
+        """Ventana ⚙️ Configuración del descargador. Todo se guarda al momento."""
+        win = getattr(self, "_yt_win_config", None)
+        if not mostrar and win is not None:
+            return
+        if mostrar and self._ventana_reusar(win):
+            self._yt_cfg_resumen()
+            return
+        c_sel, c_sel_hover = "#c0392b", "#992d22"
+        win = self._ventana_nueva("Configuración de descargas", 600, 745, fg_color="#1a1a1a",
+                                  redimensionable=(False, False), reutilizable=True)
+        self._yt_win_config = win
+        cont = ctk.CTkFrame(win, fg_color="transparent")
+        cont.pack(fill="both", expand=True, padx=22, pady=14)
+
+        ctk.CTkLabel(cont, text="⚙️  Configuración de descargas", font=(self.main_font, 18, "bold"),
+                     text_color="#ff4d4d").pack(anchor="w")
+        ctk.CTkLabel(cont, text="Se guarda sola y se aplica a las descargas que agregues desde ahora.",
+                     font=("Arial", 11), text_color="#888").pack(anchor="w", pady=(0, 6))
+
+        def _seccion(titulo):
+            f = ctk.CTkFrame(cont, fg_color="#242424", corner_radius=8)
+            f.pack(fill="x", pady=5)
+            ctk.CTkLabel(f, text=titulo, font=("Arial", 13, "bold"),
+                         text_color="#eeeeee").pack(anchor="w", padx=12, pady=(8, 2))
+            return f
+
+        def _nota(padre, texto):
+            ctk.CTkLabel(padre, text=texto, font=("Arial", 11), text_color="#9a9a9a",
+                         justify="left", wraplength=520).pack(anchor="w", padx=12, pady=(2, 9))
+
+        s1 = _seccion("🎞️  Códec de video preferido")
+        ctk.CTkSegmentedButton(s1, values=list(YT_CODECS.values()), variable=self.yt_codec_var,
+                               selected_color=c_sel, selected_hover_color=c_sel_hover,
+                               command=self._yt_cfg_guardar).pack(anchor="w", padx=12, pady=(4, 2))
+        _nota(s1, "VP9.2, AV1 y VP9 van primero cuando el video los tiene (mejor calidad por el "
+                  "mismo peso); esto decide entre H.264 y H.265: H.264 se reproduce en cualquier "
+                  "equipo y H.265 pesa menos. Nunca baja la resolución elegida.")
+
+
+        s2 = _seccion("🔊  Pista de audio (videos doblados)")
+        ctk.CTkSegmentedButton(s2, values=list(YT_PISTAS_AUDIO.values()), variable=self.yt_pistas_var,
+                               selected_color=c_sel, selected_hover_color=c_sel_hover,
+                               command=self._yt_cfg_guardar).pack(anchor="w", padx=12, pady=(4, 2))
+        _nota(s2, "Muchos videos de YouTube traen el audio doblado a otros idiomas. Si el elegido no "
+                  "está, queda el original. Ambas = español + inglés; Preguntarme = al descargar se "
+                  "abre una ventana con las pistas del video. En modo Audio se guarda una sola.")
+
+        s3 = _seccion("💬  Subtítulos dentro del video (modo Video)")
+        ctk.CTkSegmentedButton(s3, values=list(YT_SUBS_IDIOMAS.values()), variable=self.yt_subs_idiomas_var,
+                               selected_color=c_sel, selected_hover_color=c_sel_hover,
+                               command=self._yt_cfg_guardar).pack(anchor="w", padx=12, pady=(4, 2))
+        _nota(s3, "Solo los que subió el autor (nunca los automáticos); quedan como pista que se "
+                  "activa en el reproductor. Preguntarme = al descargar se abre una ventana con los "
+                  "idiomas del video. Si el video no tiene, se descarga igual, sin subtítulos.")
+
+        s5 = _seccion("🎤  Letra de la canción (YouTube Music, modo Video)")
+        ctk.CTkSwitch(s5, text="Incluir la letra", variable=self.yt_letras_var, progress_color=c_sel,
+                      command=self._yt_cfg_guardar).pack(anchor="w", padx=12, pady=(4, 2))
+        _nota(s5, "Solo enlaces de music.youtube.com (Spotify no) y en modo Video: la letra va como "
+                  "pista «Letra» (si tiene tiempos) y en la etiqueta de letra del video. La busca en "
+                  "LRCLIB, YouTube Music y otros; si no aparece, se descarga igual, sin letra.")
+
+        s4 = _seccion("🎵  Spotify")
+        ctk.CTkCheckBox(s4, text="Avisar al descargar de Spotify", variable=self.yt_aviso_spotify_var,
+                        fg_color="#1DB954", hover_color="#17a34a", checkmark_color="white",
+                        command=self._on_toggle_aviso_spotify).pack(anchor="w", padx=12, pady=(4, 10))
+
+        pie = ctk.CTkFrame(cont, fg_color="transparent")
+        pie.pack(side="bottom", fill="x", pady=(8, 0))
+        ctk.CTkButton(pie, text="Cerrar", width=110, height=32, fg_color="#444", hover_color="#555",
+                      command=lambda: self._ventana_ocultar(win)).pack(side="right")
+        # Etiqueta nativa de Tk: al cambiar el texto se reemplaza de una vez (la de CTk se
+        # redimensionaba y redibujaba su lienzo aparte, y por un momento se veía mal)
+        try:
+            escala = float(ctk.ScalingTracker.get_widget_scaling(pie))
+        except Exception:
+            escala = 1.0
+        # (la fuente se guarda: si Python la libera, Tk la borra y la etiqueta la pierde)
+        self._yt_cfg_fuente_resumen = tkfont.Font(pie, family="Arial", size=-max(9, int(round(11 * escala))))
+        self._yt_cfg_lbl_resumen = tk.Label(pie, text="", anchor="w", justify="left", bd=0,
+                                            fg="#9a9a9a", bg="#1a1a1a", font=self._yt_cfg_fuente_resumen)
+        self._yt_cfg_lbl_resumen.pack(side="left", fill="x", expand=True)
+        win.bind("<Escape>", lambda e: self._ventana_ocultar(win))
+        self._yt_cfg_resumen()
+        if mostrar:
+            self._ventana_mostrar(win)
+
+    def _dialogo_listas(self, *, titulo_ventana, titulo, subtitulo, texto, secciones,
+                        texto_aceptar="✔ Aceptar", color="#1f6aa5", color_hover="#18537f",
+                        color_titulo=None, texto_cancelar="Cancelar", texto_recordar=None,
+                        recordar_inicial=False, ancho=560):
+        """
+        (Hilo de la interfaz) Ventana modal con una o varias listas para marcar
+        (ListaMarcable), cada una con sus botones rápidos (Todas / Ninguna /
+        Original…). Todas las ventanas de pistas de audio y subtítulos la usan.
+        secciones: [{"filas": [...], "multiple": bool, "minimo": int (cuántas hay que
+            marcar para aceptar), "rapidos": [(texto, criterio(valor))], "titulo": str,
+            "nota": str, "aviso_minimo": str, "extra": (texto, valor que devuelve)}]
+        Devuelve (resultado, ¿recordar?): resultado = [lo marcado en cada sección],
+        None si se canceló o el valor del botón "extra".
+        """
+        resultado = {"v": None, "recordar": False}
+        win = self._ventana_nueva(titulo_ventana, ancho, 420, fg_color="#1a1a1a",
+                                  redimensionable=(False, False))
+        cont = ctk.CTkFrame(win, fg_color="transparent")
+        cont.pack(fill="both", expand=True, padx=20, pady=14)
+        ctk.CTkLabel(cont, text=titulo, font=(self.main_font, 17, "bold"),
+                     text_color=color_titulo or color).pack(anchor="w")
+        if subtitulo:
+            ctk.CTkLabel(cont, text=subtitulo, font=("Arial", 12), text_color="#dddddd",
+                         wraplength=ancho - 50, justify="left").pack(anchor="w")
+        if texto:
+            ctk.CTkLabel(cont, text=texto, font=("Arial", 11), text_color="#8a8a8a",
+                         wraplength=ancho - 50, justify="left").pack(anchor="w", pady=(2, 4))
+
+        estado = {"aviso": None}
+
+        def _limpiar_aviso():
+            if estado["aviso"] is not None and estado["aviso"].cget("text"):
+                estado["aviso"].configure(text="")
+
+        def _cerrar(valor):
+            resultado["v"] = valor
+            resultado["recordar"] = bool(recordar.get()) and bool(texto_recordar)
+            try:
+                win.grab_release()
+            except Exception:
+                pass
+            win.destroy()
+
+        listas = []
+        filas_visibles = 9 if len(secciones) == 1 else 5
+        for sec in secciones:
+            if sec.get("titulo"):
+                ctk.CTkLabel(cont, text=sec["titulo"], font=("Arial", 12, "bold"),
+                             text_color="#e0e0e0").pack(anchor="w", pady=(8, 2))
+            lista = ListaMarcable(cont, sec["filas"], multiple=sec.get("multiple", True), color=color,
+                                  filas_visibles=sec.get("filas_visibles", filas_visibles),
+                                  al_cambiar=_limpiar_aviso)
+            lista.pack(fill="x", pady=(2, 0))
+            if sec.get("rapidos") or sec.get("extra"):
+                fila = ctk.CTkFrame(cont, fg_color="transparent")
+                fila.pack(fill="x", pady=(6, 0))
+                for n, (txt, criterio) in enumerate(sec.get("rapidos") or []):
+                    ctk.CTkButton(fila, text=txt, width=84, height=26, fg_color="#3a3a3a",
+                                  hover_color="#4a4a4a",
+                                  command=lambda c=criterio, l=lista: l.marcar(c)).pack(
+                        side="left", padx=(0 if n == 0 else 6, 0))
+                if sec.get("extra"):
+                    txt, valor = sec["extra"]
+                    ctk.CTkButton(fila, text=txt, height=26, fg_color="transparent", border_width=1,
+                                  border_color="#555", hover_color="#333",
+                                  command=lambda v=valor: _cerrar(v)).pack(side="right")
+            if sec.get("nota"):
+                ctk.CTkLabel(cont, text=sec["nota"], font=("Arial", 11), text_color="#8a8a8a",
+                             wraplength=ancho - 50, justify="left").pack(anchor="w", pady=(4, 0))
+            listas.append((lista, sec))
+
+        recordar = ctk.BooleanVar(value=bool(recordar_inicial))
+        if texto_recordar:
+            ctk.CTkCheckBox(cont, text=texto_recordar, variable=recordar, font=("Arial", 11),
+                            fg_color=color, hover_color=color_hover).pack(anchor="w", pady=(12, 0))
+
+        botones = ctk.CTkFrame(cont, fg_color="transparent")
+        botones.pack(fill="x", pady=(12, 0))
+        estado["aviso"] = ctk.CTkLabel(botones, text="", font=("Arial", 11), text_color="#f39c12")
+        estado["aviso"].pack(side="left")
+
+        def _aceptar():
+            valores = []
+            for lista, sec in listas:
+                marcadas = lista.valores()
+                if len(marcadas) < sec.get("minimo", 1):
+                    estado["aviso"].configure(text=sec.get("aviso_minimo") or "Marca al menos una opción.")
+                    return
+                valores.append(marcadas)
+            _cerrar(valores)
+
+        ctk.CTkButton(botones, text=texto_aceptar, width=120, height=34, fg_color=color,
+                      hover_color=color_hover, font=("Arial", 12, "bold"), command=_aceptar).pack(side="right")
+        ctk.CTkButton(botones, text=texto_cancelar, width=150, height=34, fg_color="#444",
+                      hover_color="#555", command=lambda: _cerrar(None)).pack(side="right", padx=(0, 8))
+        win.protocol("WM_DELETE_WINDOW", lambda: _cerrar(None))
+        win.bind("<Escape>", lambda e: _cerrar(None))
+        win.bind("<Return>", lambda e: _aceptar())
+
+        # Alto justo para lo que tiene (con las listas largas, se desliza la lista)
+        try:
+            win.update_idletasks()
+            escala = float(win._get_window_scaling())
+            alto = int(cont.winfo_reqheight() / escala) + 30
+            win._dmt_tamano = (ancho, max(260, min(alto, 760)))
+        except Exception:
+            pass
+        self._modal_mostrar(win)
+        return resultado["v"], resultado["recordar"]
+
+    def _elegir_opciones(self, titulo_ventana, titulo, subtitulo, texto, opciones, multiple,
+                         texto_cancelar, con_recordar=False, minimo=1, rapidos=None):
+        """
+        (Hilo de la interfaz) Ventana para marcar opciones: [(etiqueta, valor, marcada)].
+        rapidos: botones para marcar de un clic, [(texto, criterio(valor))]; si no
+        se indican, Todos / Ninguno. minimo: cuántas hay que marcar para aceptar
+        (0 = se puede aceptar sin ninguna: devuelve []).
+        Devuelve (valores elegidos o None si se cancela, ¿usar lo mismo en el resto?).
+        """
+        if rapidos is None:
+            rapidos = [("Todos", lambda v: True), ("Ninguno", lambda v: False)] if multiple else []
+        res, recordar = self._dialogo_listas(
+            titulo_ventana=titulo_ventana, titulo=titulo, subtitulo=subtitulo, texto=texto,
+            secciones=[{"filas": opciones, "multiple": multiple, "minimo": minimo, "rapidos": rapidos}],
+            color="#c0392b", color_hover="#992d22", color_titulo="#ff4d4d", texto_cancelar=texto_cancelar,
+            texto_recordar="Usar la misma elección para el resto de la lista" if con_recordar else None,
+            recordar_inicial=True)
+        return (res[0] if isinstance(res, list) else None), recordar
+
+    def _yt_preguntar(self, data, info, mode, pistas_cfg, subs_cfg, lista=False):
+        """
+        (Hilo de la descarga) "Preguntarme" de ⚙️ Configuración: muestra las pistas
+        de audio y los subtítulos que ofrece ESTE video y devuelve (pistas,
+        subtítulos) elegidos. En una playlist se pregunta una vez y se aplica al
+        resto. Cancelar no corta la descarga: queda el audio original / sin subtítulos.
+        """
+        titulo = str((info or {}).get("title") or data.get("url") or "")[:100]
+
+        def _estado(texto):
+            self._en_ui(data["lbl_status"].configure, text=texto, text_color="#aaaaff")
+
+        if pistas_cfg == "preguntar":
+            idiomas = _yt_idiomas_audio(info)
+            if len(idiomas) < 2:
+                pistas_cfg = "original"
+            elif "_eleccion_audio" in data:
+                pistas_cfg = _yt_equivalentes(data["_eleccion_audio"], [l for l, _ in idiomas]) or "original"
+            else:
+                opciones = [(f"{_idioma_nombre(l)}{' · original' if o else ''}  ({l})", l, o)
+                            for l, o in idiomas]
+                if not any(o for _, _, o in opciones):
+                    opciones[0] = (opciones[0][0], opciones[0][1], True)
+                texto = ("Este video trae el audio en varios idiomas. Marca los que quieras: quedan "
+                         "todos en el archivo y se eligen en el reproductor."
+                         if mode != "Audio" else
+                         "Este video trae el audio en varios idiomas. En modo Audio se guarda uno.")
+                original = next((v for _, v, o in opciones if o), opciones[0][1])
+                # Hay que bajar una como mínimo: en vez de "Ninguna", "Original"
+                rapidos = ([("Todas", lambda v: True)] if mode != "Audio" else []) + \
+                    [("Original", lambda v: v == original)]
+                _estado("🔊 Elige las pistas de audio…")
+                elegidas, recordar = self._en_ui_espera(
+                    self._elegir_opciones, "Pistas de audio", "🔊  ¿Qué pistas de audio bajar?", titulo,
+                    texto, opciones, mode != "Audio", "Solo la original", lista, 1, rapidos)
+                pistas_cfg = elegidas or "original"
+                if recordar and elegidas:
+                    data["_eleccion_audio"] = elegidas
+        if subs_cfg == "preguntar":
+            subidos = {k: v for k, v in ((info or {}).get("subtitles") or {}).items()
+                       if v and k != "live_chat"}
+            if _yt_es_tiktok(info) or not subidos:
+                subs_cfg = None
+                print("[Subtítulos] El video no tiene subtítulos subidos por el autor.")
+            elif "_eleccion_subs" in data:
+                subs_cfg = _yt_equivalentes(data["_eleccion_subs"], list(subidos)) or None
+            else:
+                previos = getattr(self, "_yt_subs_ultimos", set())
+                opciones = []
+                for lang in sorted(subidos, key=_subs_orden_idioma):
+                    nombre = next((f.get("name") for f in subidos[lang] if f.get("name")), None) \
+                        or _idioma_nombre(lang)
+                    opciones.append((f"{nombre} ({lang})", lang, lang in previos))
+                if not any(m for _, _, m in opciones):
+                    for base in ("es", "en"):
+                        i = next((i for i, (_, l, _) in enumerate(opciones) if _subs_idioma_base(l) == base), None)
+                        if i is not None:
+                            opciones[i] = (opciones[i][0], opciones[i][1], True)
+                            break
+                _estado("💬 Elige los subtítulos…")
+                elegidos, recordar = self._en_ui_espera(
+                    self._elegir_opciones, "Subtítulos", "💬  ¿Qué subtítulos incluir?", titulo,
+                    "Los que subió el autor del video. Quedan como pistas que se activan en el "
+                    "reproductor (no pegados a la imagen). Ninguno = sin subtítulos.", opciones, True,
+                    "Sin subtítulos", lista, 0)
+                subs_cfg = elegidos or None
+                if elegidos:
+                    self._yt_subs_ultimos = set(elegidos)
+                if recordar and elegidos is not None:
+                    data["_eleccion_subs"] = elegidos       # también "ninguno" vale para el resto
+        return pistas_cfg, subs_cfg
+
+    def _yt_bajar_subtitulos(self, url, carpeta, nombre_base, idiomas, info=None, crudo=None):
+        """
+        Subtítulos para incrustar (⚙️ Configuración): SOLO los que subió el autor,
+        en una llamada aparte para que, si fallan (p. ej. HTTP 429 de YouTube),
+        el video se guarde igual, sin ellos. TikTok no: todos sus subtítulos son
+        automáticos. Devuelve cuántas pistas quedaron listas.
+        """
+        if not idiomas or _yt_es_tiktok(info or url):
+            return 0
+        if isinstance(idiomas, (list, tuple)):
+            def _pedido(k):
+                return k in idiomas
+        else:
+            pedidos = _subs_idiomas_pedidos(idiomas)
+
+            def _pedido(k):
+                return _subs_idioma_base(k) in pedidos
+        if info and isinstance(info.get("subtitles"), dict):
+            if not any(_pedido(k) for k in info["subtitles"]):
+                print("[Subtítulos] El video no tiene subtítulos subidos en esos idiomas.")
+                return 0
+        opts = _yt_opts_subtitulos(idiomas)
+        opts.update({"skip_download": True, "quiet": True, "no_warnings": True,
+                     "noplaylist": True, "ignoreerrors": True, "socket_timeout": 20,
+                     "outtmpl": os.path.join(carpeta, f"{nombre_base}.%(ext)s")})
+        opts.update(_yt_opts_robustos())
+        try:
+            with yt_dlp.YoutubeDL(opts) as ydl:
+                if crudo is not None:           # YouTube: sin volver a analizar
+                    import copy
+                    ydl.process_ie_result(copy.deepcopy(crudo), download=True)
+                else:
+                    ydl.download([url])
+        except Exception as e:
+            print(f"[Subtítulos] No se pudieron bajar (el video se guarda sin ellos): {e}")
+        n = len(_yt_subtitulos_descargados(carpeta))
+        print(f"[Subtítulos] {n} pista(s) lista(s) para incrustar.")
+        return n
 
     # --- HELPERS UI ---
     def _on_yt_cont_change(self, value):
@@ -17873,6 +21802,10 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
             "cfg_container": self.yt_cont_var.get(),      # <--- AGREGAR
             "cfg_path": self.yt_save_path.get(),          # <--- AGREGAR (Para que no falle si cambias carpeta también)
             "cfg_metadata": self.yt_metadata_var.get(),   # Estado congelado al presionar AGREGAR
+            "cfg_codec": self._yt_cfg_codec(),            # ⚙️ Configuración, también congelada
+            "cfg_subs": self._yt_cfg_subs(),
+            "cfg_letras": bool(self.yt_letras_var.get()),  # letra (solo YouTube Music)
+            "cfg_pistas": self._yt_cfg_pistas(),          # idiomas de audio (doblajes)
             # ---------------------------------------------------
             "frame": item_frame,
             "decision_frame": decision_frame,
@@ -17950,6 +21883,160 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
     
     
 
+    def _yt_extraer_info(self, opts, url, debe_parar, crudo_out=None, solo_audio=False, aviso=None):
+        """
+        extract_info(download=False) que se puede cancelar: el análisis corre en
+        un hilo aparte y, si la descarga se cancela o pausa mientras tanto, se deja
+        de esperarlo (termina solo en segundo plano, sin bajar nada). Antes el hilo
+        quedaba atrapado en "Analizando..." ocupando su lugar en la cola.
+        crudo_out (lista): si es un video de YouTube, recibe una copia del
+        resultado ANTES de procesarlo, para bajarlo después sin volver a pedir la
+        página ni resolver los retos otra vez (ver _yt_bajar).
+        solo_audio / aviso: ver _yt_extraer_crudo (edición del video).
+        """
+        caja = {}
+
+        def _analizar():
+            try:
+                with yt_dlp.YoutubeDL(opts) as ydl:
+                    if crudo_out is None:
+                        caja["info"] = ydl.extract_info(url, download=False)
+                    else:
+                        # Lo mismo que extract_info(download=False): extraer y luego procesar
+                        crudo = _yt_extraer_crudo(ydl, url, solo_audio, aviso, debe_parar)
+                        if _yt_es_youtube(crudo) and crudo.get("_type", "video") == "video":
+                            try:
+                                import copy
+                                caja["crudo"] = copy.deepcopy(crudo)
+                            except Exception:
+                                pass
+                        caja["info"] = ydl.process_ie_result(crudo, download=False)
+            except BaseException as e:
+                caja["error"] = e
+
+        t = threading.Thread(target=_analizar, name="dmt_yt_analisis", daemon=True)
+        t.start()
+        while t.is_alive():
+            t.join(0.25)
+            if debe_parar():
+                raise _YtDetenido("Detenido por usuario")
+        if "error" in caja:
+            raise caja["error"]
+        if crudo_out is not None and "crudo" in caja:
+            crudo_out.append(caja["crudo"])
+        return caja.get("info")
+
+    def _yt_bajar(self, ydl, url, crudo, data, carpeta=None, duracion=None):
+        """
+        Descarga con yt-dlp. En YouTube reutiliza lo que ya se analizó ('crudo'):
+        se ahorra volver a pedir la página y resolver los retos (1-2 s por video).
+        Si esos enlaces ya no sirven (p. ej. un 403 a mitad de camino), se analiza
+        de nuevo y se baja DESDE CERO: lo que quedó a medio bajar no se retoma con
+        los enlaces nuevos (el empalme podía salir roto).
+        Los formatos de OTRA edición del video (YouTube a veces entrega una versión
+        anterior, con segundos de menos) se descartan antes de elegir. Si igual el
+        archivo dura distinto que el video, se avisa (volver a bajar lo mismo no
+        sirve: antes se repetía la descarga hasta 3 veces para nada).
+        """
+        if crudo is not None:
+            try:
+                import copy
+                ydl.process_ie_result(copy.deepcopy(crudo), download=True)
+                self._yt_revisar_duracion(data, carpeta, duracion)
+                return
+            except Exception as e:
+                if data["cancel_flag"] or data["status"] != "active":
+                    raise                   # pausa / cancelación: no se reintenta
+                print(f"[YT] No se pudo reutilizar el análisis ({str(e)[:120]}); se analiza de nuevo.")
+            self._yt_vaciar_carpeta(carpeta)
+        _yt_extraer_bajar(ydl, url, solo_audio=data.get("cfg_mode") == "Audio")
+        self._yt_revisar_duracion(data, carpeta, duracion)
+
+    @staticmethod
+    def _yt_nota(data, texto):
+        """Suma una nota al estado final de la descarga ("✅ Terminado · …")."""
+        data["nota_final"] = data.get("nota_final", "") + texto
+
+    def _yt_archivo_bajado(self, carpeta):
+        """El archivo de video/audio que dejó yt-dlp en la carpeta temporal (el más grande)."""
+        try:
+            archivos = [os.path.join(carpeta, f) for f in os.listdir(carpeta)
+                        if os.path.isfile(os.path.join(carpeta, f))
+                        and not f.endswith((".part", ".ytdl", ".json", ".jpg", ".webp", ".png"))
+                        and not f.lower().endswith(_SUBS_EXTS)
+                        and not f.startswith(("_dmt_", "_cover"))]
+        except OSError:
+            return None
+        return max(archivos, key=os.path.getsize) if archivos else None
+
+    def _yt_revisar_duracion(self, data, carpeta, duracion):
+        """Avisa si lo bajado dura claramente distinto que el video en YouTube (otra edición)."""
+        try:
+            duracion = float(duracion or 0)
+        except (TypeError, ValueError):
+            duracion = 0
+        if not carpeta or duracion <= 0:
+            return
+        archivo = self._yt_archivo_bajado(carpeta)
+        real = self._yt_duracion_real(archivo) if archivo else 0
+        if real > 0 and abs(real - duracion) > max(3.0, duracion * 0.01):
+            print(f"[YT] ⚠️ {os.path.basename(archivo)} dura {real:.0f} s y YouTube anuncia "
+                  f"{duracion:.0f} s: YouTube entrega otra edición del video (los subtítulos pueden no coincidir).")
+            self._yt_nota(data, f" · ⚠️ dura {real:.0f} s (YouTube dice {duracion:.0f} s)")
+
+    def _yt_duracion_real(self, ruta):
+        """
+        Cuánto dura lo bajado. El audio HLS (los doblajes) queda como AAC "crudo" y
+        ahí FFmpeg solo ESTIMA la duración por el bitrate (un audio de 964 s daba
+        941 s): en ese caso se toma el final del último paquete.
+        """
+        try:
+            salida = subprocess.run(
+                ["ffprobe", "-v", "error", "-show_entries", "format=format_name,duration", "-of", "json", ruta],
+                capture_output=True, encoding="utf-8", errors="replace", timeout=60,
+                startupinfo=self.get_startup_info()).stdout
+            fmt = json.loads(salida or "{}").get("format") or {}
+            if fmt.get("format_name") in ("aac", "mp3"):
+                paquetes = subprocess.run(
+                    ["ffprobe", "-v", "error", "-select_streams", "a:0", "-show_entries",
+                     "packet=pts_time,duration_time", "-of", "csv=p=0", ruta],
+                    capture_output=True, encoding="utf-8", errors="replace", timeout=120,
+                    startupinfo=self.get_startup_info()).stdout.split()
+                if paquetes:
+                    pts, _, dur = paquetes[-1].partition(",")
+                    return float(pts) + float(dur or 0)
+            return float(fmt.get("duration") or 0)
+        except Exception:
+            return self.get_duration(ruta) or 0
+
+    @staticmethod
+    def _yt_vaciar_carpeta(carpeta):
+        """Borra lo bajado (completo o a medias) de la carpeta temporal de UNA descarga."""
+        if not carpeta or not os.path.isdir(carpeta):
+            return
+        for f in os.listdir(carpeta):
+            ruta = os.path.join(carpeta, f)
+            try:
+                if os.path.isfile(ruta):
+                    os.remove(ruta)
+            except OSError:
+                pass
+
+    def _yt_borrar_temporal(self, task_id):
+        """Carpeta temporal que deja una descarga pausada (al cancelarla ya no sirve)."""
+        data = self.yt_downloads.get(task_id) or {}
+        if not data.get("cfg_path"):
+            return
+        carpeta = os.path.join(data["cfg_path"], f"temp_{task_id}")
+
+        def _borrar():
+            shutil.rmtree(carpeta, ignore_errors=True)
+            try:
+                self.yt_active_temps.remove(carpeta)
+            except (AttributeError, ValueError):
+                pass
+        threading.Thread(target=_borrar, daemon=True).start()
+
     # --- COLA DE DESCARGAS: máximo YT_MAX_DESCARGAS bajando a la vez ---
     def _yt_hilo_vigente(self, data, hilo=None):
         """False si la tarea ya la tomó otro hilo (se pausó y se reanudó mientras tanto)."""
@@ -17979,6 +22066,7 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
                             and len(self._yt_cola_activos) < YT_MAX_DESCARGAS):
                         self._yt_cola_espera.pop(0)
                         self._yt_cola_activos.add(turno)
+                        data["_turno"] = turno      # para soltarlo al instante si se cancela
                         if posicion is not None and texto_al_entrar:
                             self._en_ui(data["lbl_status"].configure,
                                         text=texto_al_entrar, text_color="white")
@@ -18042,10 +22130,18 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
             """Toda actualización de widgets desde este hilo pasa por aquí."""
             self._en_ui(fn)
 
-        # Turno en la cola de descargas: consultar Spotify y cada lote de spotDL
-        # ocupan uno (máximo YT_MAX_DESCARGAS bajando a la vez)
+        # Spotify NO pasa por la cola de descargas: cada canción se busca y se baja
+        # aparte (ya es lento de por sí) y no debe esperar ni frenar a las de YouTube.
         turno = None
         hilo = threading.current_thread()
+
+        def _detenido():
+            """Cancelada, pausada o reanudada en otro hilo: esta ya no sigue."""
+            return (data["cancel_flag"] or data["status"] in ("cancelled", "paused")
+                    or not self._yt_hilo_vigente(data, hilo))
+
+        def _proceso(p):
+            data["process_handle"] = p
 
         try:
             os.makedirs(save_folder, exist_ok=True)
@@ -18069,13 +22165,18 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
 
             # --- Formato y calidad (respetando lo elegido en la UI) ---
             cont_map = {"MP3": "mp3", "M4A": "m4a", "OPUS": "opus", "WAV": "wav",
-                        "MP4": "mp3", "MKV": "mp3"}  # spotDL es solo audio
+                        "MP4": "m4a", "MKV": "m4a"}  # spotDL es solo audio
             formato = cont_map.get(container, "mp3")
 
             if   "Optimizado" in quality: bitrate = "192k"
             elif "Estándar"   in quality: bitrate = "128k"
             elif "Ligero"     in quality: bitrate = "64k"
             else:                          bitrate = "disable"  # 🔒 Original: sin reconversión
+            if container in ("MP4", "MKV"):
+                # Modo Video: spotDL solo baja audio → el M4A de YouTube tal cual
+                # (la mejor calidad posible, sin recomprimir). En modo Audio manda
+                # lo elegido en la interfaz.
+                bitrate = "disable"
 
             base_args = [
                 "--audio", "youtube",
@@ -18086,70 +22187,20 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
             ]
 
             # --- 1. RESOLVER LISTA DE CANCIONES (sin descargar) ---
-            turno = self._yt_tomar_turno(data)
+            if _detenido():
+                raise _YtDetenido("Detenido por usuario")
             _ui(lambda: data["lbl_status"].configure(text="🔍 Analizando enlace de Spotify...", text_color="cyan"))
             temp_dir = os.path.join(save_folder, f"_sp_tmp_{task_id[:8]}")
             os.makedirs(temp_dir, exist_ok=True)
-            save_file = os.path.join(temp_dir, "lista.spotdl")
 
             canciones = []
-            def _extraer_json(texto):
-                """
-                spotDL mezcla líneas de log con el JSON en la misma salida, y
-                esas líneas de log también traen '[' (ej. '[download] ...'),
-                así que agarrar el primer '[' rompe el parseo. Se prueba cada
-                posición candidata hasta que una decodifique de verdad.
-                """
-                texto = (texto or "").strip()
-                if not texto:
-                    return []
-                dec = json.JSONDecoder()
-                posiciones = [i for i, ch in enumerate(texto) if ch in '[{'][:300]
-                for i in posiciones:
-                    try:
-                        datos, _ = dec.raw_decode(texto[i:])
-                    except Exception:
-                        continue
-                    if isinstance(datos, list) and datos:
-                        return datos
-                    if isinstance(datos, dict):
-                        posibles = datos.get("songs") or []
-                        if posibles:
-                            return posibles
-                return []
-
             try:
-                # spotDL admite "--save-file -" para imprimir el JSON por
-                # stdout en vez de escribirlo a disco (más confiable que
-                # depender de la ruta del archivo).
-                r = subprocess.run(
-                    _cmd_modulo_python("spotdl") + ["save", url,
-                     "--save-file", "-"] + base_args,
-                    capture_output=True, text=True, encoding="utf-8", errors="ignore",
-                    timeout=300, startupinfo=self.get_startup_info(),
-                    env=_env_subproceso_utf8(),
-                )
-                canciones = _extraer_json(r.stdout)
-
-                # Respaldo: intentar con archivo si stdout no sirvió
-                if not canciones:
-                    r2 = subprocess.run(
-                        _cmd_modulo_python("spotdl") + ["save", url,
-                         "--save-file", save_file] + base_args,
-                        capture_output=True, text=True, encoding="utf-8", errors="ignore",
-                        timeout=300, startupinfo=self.get_startup_info(),
-                        env=_env_subproceso_utf8(),
-                    )
-                    if os.path.exists(save_file):
-                        try:
-                            with open(save_file, "r", encoding="utf-8") as f:
-                                canciones = _extraer_json(f.read())
-                        except Exception as fe:
-                            print(f"[Spotify] No se pudo leer el archivo de lista: {fe}")
-                    if not canciones:
-                        print(f"[Spotify] 'save' no devolvió canciones.")
-                        print(f"[Spotify]   stdout: {(r2.stdout or '')[:300]}")
-                        print(f"[Spotify]   stderr: {(r2.stderr or '')[:300]}")
+                # Se puede cancelar mientras dice "Analizando" (antes seguía
+                # hasta 5 minutos aunque se cancelara)
+                canciones = _spotdl_listar(url, base_args, debe_parar=_detenido,
+                                           carpeta_tmp=temp_dir, on_proceso=_proceso)
+            except _YtDetenido:
+                raise
             except Exception as se:
                 print(f"[Spotify] No se pudo resolver la lista: {se}")
 
@@ -18167,9 +22218,12 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
                 """
                 hechas, sin_m = 0, []
                 salida_tmpl = os.path.join(carpeta_destino, "{artists} - {title}.{output-ext}")
+                # Varias canciones a la vez (spotDL las busca y baja en paralelo):
+                # de a una, un álbum o playlist tardaba muchísimo
+                hilos_spotdl = max(1, min(3, len(queries)))
                 proceso = subprocess.Popen(
                     _cmd_modulo_python("spotdl") + ["download"] + list(queries) +
-                    ["--output", salida_tmpl, "--threads", "1"] + base_args,
+                    ["--output", salida_tmpl, "--threads", str(hilos_spotdl)] + base_args,
                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                     universal_newlines=True, encoding="utf-8", errors="ignore",
                     startupinfo=self.get_startup_info(),
@@ -18179,7 +22233,7 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
                 try:
                     for linea in proceso.stdout:
                         if data["status"] in ("cancelled", "paused") or data["cancel_flag"]:
-                            proceso.kill()
+                            _proc_matar_arbol(proceso)
                             break
                         linea = linea.rstrip()
                         print(f"[spotDL] {linea}")
@@ -18238,11 +22292,6 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
                     data["status"] = "finished"
                     _ui(lambda: data["btn_pause"].configure(state="disabled"))
                 return
-
-            # La lista ya está resuelta: mientras se espera la respuesta del
-            # aviso de playlist no se ocupa lugar en la cola (cada lote pide el suyo)
-            self._yt_soltar_turno(turno)
-            turno = None
 
             total = len(canciones)
 
@@ -18324,15 +22373,11 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
                     _ui(lambda n=inicio + 1: data["lbl_title"].configure(
                         text=f"📋 {safe_pl}  ({n}/{total})"))
 
-                # Cola de descargas: el lote espera su turno para bajar
-                try:
-                    turno = self._yt_tomar_turno(data, "Descargando desde Spotify...")
-                except _YtDetenido:
-                    if not self._yt_hilo_vigente(data, hilo):
-                        return
-                    _ui(lambda d=done_count: data["lbl_status"].configure(
-                        text=f"⛔ Detenido en {d}/{total}", text_color="orange"))
-                    break
+                # Sin cola: el lote arranca de inmediato
+                if not self._yt_hilo_vigente(data, hilo):
+                    return
+                _ui(lambda: data["lbl_status"].configure(
+                    text="Descargando desde Spotify...", text_color="white"))
 
                 try:
                     hechas, sin_m = _correr_spotdl(queries, destino, total, offset=inicio)
@@ -18431,6 +22476,9 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
         container = data["cfg_container"]
         save_folder = data["cfg_path"]
         embed_meta = data.get("cfg_metadata", False)  # Estado aislado: no cambia aunque el usuario mueva el checkbox
+        codec = _yt_codec_valido(data.get("cfg_codec"))    # ⚙️ Configuración
+        subs_idiomas = data.get("cfg_subs") if mode != "Audio" else None
+        pistas_cfg = data.get("cfg_pistas", "original")
         if not os.path.exists(save_folder): os.makedirs(save_folder, exist_ok=True)
 
         # Carpeta temporal
@@ -18448,6 +22496,11 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
         # Turno en la cola de descargas (máximo YT_MAX_DESCARGAS bajando a la vez)
         turno = None
         hilo = threading.current_thread()
+
+        def _detenido():
+            """Cancelada, pausada o reanudada en otro hilo: esta ya no sigue."""
+            return (data["cancel_flag"] or data["status"] in ("cancelled", "paused")
+                    or not self._yt_hilo_vigente(data, hilo))
 
         # --- A. DEFINIR EL OBJETIVO (TARGET) ---
         limit_height = 0
@@ -18482,7 +22535,8 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
         target_bitrate = _MODE_KBPS.get(audio_mode, 256) * 1000
 
         if mode == "Audio":
-            ydl_opts['format'] = 'bestaudio/best'
+            # TikTok: el audio REAL del video, no su pista de música (se afina al analizar)
+            ydl_opts['format'] = _yt_formato_audio(url)
         else:
             limit_height = 1080
             if "4K" in quality: limit_height = 2160
@@ -18492,7 +22546,8 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
 
             ydl_opts['merge_output_format'] = container.lower()  # remuxear directo al contenedor pedido (antes: fijo a 'mkv')
             if 'postprocessor_args' in ydl_opts: del ydl_opts['postprocessor_args']
-            ydl_opts['format'] = f'bestvideo[height<={limit_height}]+bestaudio/best[height<={limit_height}]'
+            # Provisorio: se afina con los formatos reales al terminar el análisis
+            ydl_opts['format'] = _yt_formato_video(limit_height, {"webpage_url": url})
 
         try:
             # --- COLA: si ya hay YT_MAX_DESCARGAS bajando, espera su turno ---
@@ -18516,6 +22571,8 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
             # ─────────────────────────────────────────────────────────────
 
             pl_entries    = None
+            crudo_yt = []           # YouTube: resultado sin procesar, para no analizar dos veces
+            crudo_t = time.time()
             original_title = 'Video_Sin_Nombre'
 
             if _treat_as_playlist:
@@ -18527,10 +22584,11 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
                 }
                 _pl_opts.update(_yt_opts_robustos())
                 try:
-                    with yt_dlp.YoutubeDL(_pl_opts) as _ydl_pl:
-                        _pl_info = _ydl_pl.extract_info(_pl_url, download=False)
+                    _pl_info = self._yt_extraer_info(_pl_opts, _pl_url, _detenido)
                     pl_entries     = [e for e in _pl_info.get('entries', []) if e]
                     original_title = _pl_info.get('title', 'Lista_Reproduccion')
+                except _YtDetenido:
+                    raise
                 except Exception as _pe:
                     print(f"[YT] Error extrayendo playlist: {_pe}")
                     # Si falla la extracción de playlist → tratar como video individual
@@ -18547,14 +22605,53 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
                 }
                 _sv_opts.update(_yt_opts_robustos())
                 try:
-                    with yt_dlp.YoutubeDL(_sv_opts) as _ydl_sv:
-                        info = _ydl_sv.extract_info(url, download=False)
+                    info = self._yt_extraer_info(
+                        _sv_opts, url, _detenido, crudo_out=crudo_yt, solo_audio=(mode == "Audio"),
+                        aviso=lambda n: _estado(f"Analizando... (YouTube dio otra edición del video: "
+                                                f"intento {n} de {_YT_INTENTOS_EDICION})", "yellow")) or {}
+                    crudo_t = time.time()
                     original_title = info.get('title') or 'Video_Sin_Nombre'
+                except _YtDetenido:
+                    raise
                 except Exception as _sve:
                     print(f"[YT] Error extrayendo info individual: {_sve}")
                     info = {}
                     original_title = 'Video_Sin_Nombre'
+                # Formato según lo que el sitio ofrece de verdad (en TikTok: el
+                # video con su propio audio, no "solo video" + pista de música;
+                # también en modo Audio)
+                # "Preguntarme" (⚙️ Configuración): pistas de audio y subtítulos de ESTE
+                # video. Mientras la ventana espera, esta descarga no ocupa lugar en la cola.
+                if "preguntar" in (pistas_cfg, subs_idiomas):
+                    self._yt_soltar_turno(turno)
+                    turno = None
+                    pistas_cfg, subs_idiomas = self._yt_preguntar(data, info, mode, pistas_cfg,
+                                                                  subs_idiomas)
+                    turno = self._yt_tomar_turno(data, "Analizando...")
+                if (data.get("cfg_pistas", "original") != "original" and _yt_es_youtube(info)
+                        and len(_yt_idiomas_audio(info)) < 2):
+                    if info.get("_dmt_doblajes_fuera"):
+                        self._yt_nota(data, " · sin doblajes (eran de otra edición)")
+                        print("[YT] Los doblajes eran de otra edición del video: se baja el audio original.")
+                    else:
+                        self._yt_nota(data, " · solo había audio original")
+                        print("[YT] Este video no tiene otras pistas de audio (sin doblajes): se baja la original.")
+                # Idiomas de audio (⚙️ Configuración): según lo que tiene ESTE video
+                pistas = _yt_plan_pistas(info, pistas_cfg, modo_audio=(mode == "Audio"))
+                if mode != "Audio":
+                    ydl_opts['format'] = _yt_formato_video(limit_height, info or {"webpage_url": url},
+                                                           pistas)
+                    if pistas and len(pistas) > 1:
+                        ydl_opts['allow_multiple_audio_streams'] = True
+                else:
+                    ydl_opts['format'] = _yt_formato_audio(info or url, pistas)
+                if pistas:
+                    print(f"[YT] Pistas de audio: {', '.join(pistas)}")
                 # ─────────────────────────────────────────────────────────
+
+            # Cancelada o pausada mientras se analizaba: no se sigue
+            if _detenido():
+                raise _YtDetenido("Detenido por usuario")
 
             forbidden_chars = '<>:"/\\|?*\n\r\t'
             safe_title = original_title[:100]
@@ -18649,12 +22746,33 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
                 _estado("Bajando fuentes...", "white")
 
                 # 1. DESCARGA
-                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                    ydl.download([url])
+                with _yt_ydl(ydl_opts, codec) as ydl:
+                    captura = _yt_capturar_info(ydl)      # qué formatos (e idiomas) se bajaron
+                    # YouTube: con lo que ya se analizó (si no pasó demasiado tiempo)
+                    reusar = crudo_yt[0] if crudo_yt and time.time() - crudo_t < 1800 else None
+                    self._yt_bajar(ydl, url, reusar, data, carpeta=temp_dir,
+                                   duracion=(info or {}).get("duration"))
 
                     # Ya bajó: el turno queda libre para la siguiente de la cola
                     # mientras esta convierte / empaqueta
                     self._yt_soltar_turno(turno)
+
+                    # Letra (⚙️ Configuración): SOLO enlaces de YouTube Music (nunca Spotify)
+                    # y solo en modo Video (en modo Audio no se busca ni se guarda)
+                    letra = None
+                    if (data.get("cfg_letras") and mode != "Audio" and _yt_es_ytmusic(url) and info
+                            and data["status"] == "active"):
+                        _estado("🎵 Buscando la letra...", "#aaaaff")
+                        letra = _letra_para_incrustar(info, log=lambda m: print(f"[Letra] {m.strip()}"))
+                        con = bool(letra[0] or letra[1])
+                        self._yt_nota(data, " · con letra" if con else " · sin letra (no se encontró)")
+                        print(f"[Letra] {'Encontrada' if con else 'No se encontró'}: {original_title}")
+
+                    # Subtítulos (⚙️ Configuración): aparte, si fallan el video sale igual
+                    if subs_idiomas and data["status"] == "active":
+                        _estado("Bajando subtítulos...", "#aaaaff")
+                        self._yt_bajar_subtitulos(url, temp_dir, safe_title, subs_idiomas, info,
+                                                  crudo=reusar)
 
                     # === 2. PROCESAMIENTO / REMUX (helper compartido con playlist) ===
                     if run_manual_process and data["status"] == "active":
@@ -18685,6 +22803,8 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
                             temp_dir=temp_dir, final_path=final_path, ext_final=ext_final,
                             mode=mode, container=container, audio_mode=audio_mode,
                             embed_meta=embed_meta, yt_meta=yt_meta, data=data,
+                            letra=letra,
+                            pistas_audio=_yt_pistas_bajadas(captura.get("info")),
                             should_abort=_single_should_abort, on_tick=_single_on_tick,
                             on_thumb_start=_single_on_thumb_start,
                         )
@@ -18693,7 +22813,7 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
             # --- FINALIZACIÓN ---
             if data["status"] == "active":
                 self._en_ui(data["prog_bar"].set, 1)
-                _estado("✅ Completado", "#2ecc71")
+                _estado("✅ Completado" + data.get("nota_final", ""), "#2ecc71")
 
                 # Mover archivo
                 files_in_temp = os.listdir(temp_dir)
@@ -18711,7 +22831,7 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
 
                     if moved:
                         data["status"] = "finished"
-                        _estado("✅ Terminado", "#2ECC71")
+                        _estado("✅ Terminado" + data.get("nota_final", ""), "#2ECC71")
                         self._en_ui(data["prog_bar"].set, 1.0)
                         self._en_ui(data["prog_bar"].configure, progress_color="#FF0000")
                         self._en_ui(data["btn_pause"].configure, state="disabled")
@@ -18720,7 +22840,7 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
                 else:
                     if os.path.exists(final_path):
                          data["status"] = "finished"
-                         _estado("✅ Terminado", "#2ECC71")
+                         _estado("✅ Terminado" + data.get("nota_final", ""), "#2ECC71")
                     else:
                          raise Exception("Error: Archivo no generado.")
 
@@ -19018,10 +23138,40 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
     # FIN HELPERS DE METADATOS
     # =========================================================================
 
+    @staticmethod
+    def _yt_etiqueta_letra(ruta, ext, texto):
+        """Guarda la letra en la etiqueta del archivo (USLT en MP3, ©lyr en M4A/MP4, LYRICS en OPUS)."""
+        try:
+            if ext == "mp3":
+                from mutagen.id3 import ID3, USLT, ID3NoHeaderError
+                try:
+                    tags = ID3(ruta)
+                except ID3NoHeaderError:
+                    tags = ID3()
+                tags.delall("USLT")
+                tags.add(USLT(encoding=3, lang="und", desc="", text=texto))
+                tags.save(ruta, v2_version=3)
+            elif ext in ("m4a", "mp4"):
+                archivo = MP4(ruta)
+                archivo["\xa9lyr"] = [texto]
+                archivo.save()
+            elif ext == "opus":
+                from mutagen.oggopus import OggOpus
+                archivo = OggOpus(ruta)
+                archivo["LYRICS"] = [texto]
+                archivo.save()
+            else:
+                return False
+            return True
+        except Exception as e:
+            print(f"[Letra] No se pudo guardar la letra en el archivo (no fatal): {e}")
+            return False
+
     def _yt_convertir_meta_caratula(self, *, temp_dir, final_path, ext_final,
                                      mode, container, audio_mode,
                                      embed_meta, yt_meta, data,
-                                     should_abort, on_tick=None, on_thumb_start=None):
+                                     should_abort, on_tick=None, on_thumb_start=None, letra=None,
+                                     pistas_audio=None):
         """
         Paso compartido entre la descarga individual y cada item de playlist:
           1) localiza el archivo recién descargado en temp_dir,
@@ -19051,22 +23201,26 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
         temp_files = [f for f in os.listdir(temp_dir)
                       if os.path.isfile(os.path.join(temp_dir, f))
                       and not f.endswith(('.part', '.ytdl', '.json'))
+                      and not f.lower().endswith(_SUBS_EXTS)
                       and not f.startswith(('_dmt_', '_cover'))]
         if not temp_files:
             raise Exception("Error interno: Archivo no encontrado.")
         temp_files.sort(key=lambda f: os.path.getsize(os.path.join(temp_dir, f)), reverse=True)
         temp_input = os.path.join(temp_dir, temp_files[0])
 
-        # Detectar Codec de audio de la fuente
+        # Códec de cada pista de audio de la fuente (hay varias si se pidieron doblajes)
         src_codec = "unknown"
+        codecs_audio = []
         try:
-            cmd_probe = ["ffprobe", "-v", "error", "-select_streams", "a:0", "-show_entries",
+            cmd_probe = ["ffprobe", "-v", "error", "-select_streams", "a", "-show_entries",
                          "stream=codec_name", "-of", "default=noprint_wrappers=1:nokey=1", temp_input]
-            src_codec = subprocess.check_output(
+            codecs_audio = subprocess.check_output(
                 cmd_probe, startupinfo=self.get_startup_info()
-            ).decode().strip().lower()
+            ).decode().lower().split()
+            src_codec = codecs_audio[0] if codecs_audio else "unknown"
         except Exception:
             pass
+        varias_pistas = mode != "Audio" and len(codecs_audio) >= 2
 
         dur = self.get_duration(temp_input)
         if not dur or dur <= 0: dur = 1
@@ -19125,7 +23279,7 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
                 cmd.extend(["-acodec", "libmp3lame", "-q:a", "2"])
         else:
             if container == "MP4":
-                if "aac" in src_codec:
+                if "aac" in src_codec and all("aac" in c for c in codecs_audio):
                     # Fuente de audio ya es AAC → copiar en vez de recodificar
                     # (mismo criterio que ya se usaba para M4A). El bitstream
                     # filter es el mismo que ffmpeg aplica solo cuando hace
@@ -19143,9 +23297,60 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
                 if not _mk.startswith('_') and _mv:  # '_thumbnail' se salta aquí
                     cmd.extend(['-metadata', f'{_mk}={_mv}'])
 
+        # --- PISTAS DE AUDIO (⚙️ Configuración): sin -map FFmpeg dejaría solo una ---
+        mapas_audio = ["-map", "0:v:0", "-map", "0:a"] if varias_pistas else []
+        if mode != "Audio" and pistas_audio and len(pistas_audio) == len(codecs_audio):
+            for n, (idioma, original) in enumerate(pistas_audio):
+                if not idioma:
+                    continue
+                iso3 = _idioma_iso3(idioma)
+                if iso3:
+                    cmd.extend([f"-metadata:s:a:{n}", f"language={iso3}"])
+                nombre_pista = _idioma_nombre(idioma) + (" (original)" if original else "")
+                cmd.extend([f"-metadata:s:a:{n}", f"title={nombre_pista}"])
+                if ext_final in ("mp4", "m4a", "mov"):
+                    # En MP4 los reproductores muestran este nombre (el 'title' no se guarda)
+                    cmd.extend([f"-metadata:s:a:{n}", f"handler_name={nombre_pista}"])
+            if varias_pistas:
+                for n in range(len(codecs_audio)):
+                    cmd.extend([f"-disposition:a:{n}", "default" if n == 0 else "0"])
+        cmd[4:4] = mapas_audio
+
+        # Letra sola en la etiqueta del MKV (MP3/M4A/MP4/OPUS la reciben al final, con mutagen)
+        if letra and letra[1] and ext_final == "mkv":
+            cmd.extend(["-metadata", f"LYRICS={letra[1]}"])
+
         tmp_out = os.path.join(temp_dir, f"_dmt_salida.{ext_final}")
         cmd.append(tmp_out)
         is_copy_only = "copy" in cmd
+
+        # --- SUBTÍTULOS (⚙️ Configuración): pistas seleccionables, no pegadas a la imagen ---
+        cmd_subs = None
+        subs = _yt_subtitulos_descargados(temp_dir) if mode != "Audio" else []
+        # Letra con tiempos (YouTube Music, ⚙️ Configuración): va como una pista más, "Letra"
+        if letra and letra[0] and mode != "Audio":
+            ruta_letra = os.path.join(temp_dir, "_dmt_letra.srt")
+            try:
+                cues_letra = _letra_a_cues(letra[0])
+                if cues_letra and _subs_escribir(cues_letra, ".srt", ruta_letra):
+                    subs = list(subs) + [(ruta_letra, "und", "Letra")]
+            except Exception as e:
+                print(f"[Letra] No se pudo preparar la pista de letra (no fatal): {e}")
+        if subs:
+            entradas, mapas_subs, opciones = [], [], []
+            for n, (ruta_sub, idioma3, titulo_sub) in enumerate(subs):
+                entradas += ["-i", ruta_sub]
+                mapas_subs += ["-map", f"{n + 1}:0"]
+                opciones += [f"-metadata:s:s:{n}", f"language={idioma3}",
+                             f"-metadata:s:s:{n}", f"title={titulo_sub}",
+                             f"-disposition:s:{n}", "0"]
+                if ext_final == "mp4":
+                    # En MP4 los reproductores muestran este nombre (el 'title' no se guarda)
+                    opciones += [f"-metadata:s:s:{n}", f"handler_name={titulo_sub}"]
+            opciones += ["-c:s", "mov_text" if ext_final == "mp4" else "srt"]
+            # Primero el video y el audio; después los subtítulos
+            mapas = [] if mapas_audio else ["-map", "0:v:0", "-map", "0:a:0?"]
+            cmd_subs = cmd[:4] + entradas + mapas + cmd[4:-1] + mapas_subs + opciones + [cmd[-1]]
 
         def _borrar(*rutas):
             for _r in rutas:
@@ -19155,44 +23360,56 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
                 except OSError:
                     pass
 
-        process = subprocess.Popen(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            universal_newlines=True,
-            encoding='utf-8',
-            errors='ignore',
-            startupinfo=self.get_startup_info()
-        )
-        data["process_handle"] = process
+        def _correr(comando):
+            """Corre FFmpeg mostrando el avance. Devuelve (abortado, código, últimas líneas)."""
+            process = subprocess.Popen(
+                comando,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                universal_newlines=True,
+                encoding='utf-8',
+                errors='ignore',
+                startupinfo=self.get_startup_info()
+            )
+            data["process_handle"] = process
 
-        aborted = False
-        ultimas = []
-        for line in process.stdout:
-            if should_abort():
-                process.kill()
-                aborted = True
-                break
+            abortado = False
+            ultimas = []
+            for line in process.stdout:
+                if should_abort():
+                    process.kill()
+                    abortado = True
+                    break
 
-            if line.strip():
-                ultimas.append(line.strip())
-                del ultimas[:-12]
-            tm = re.search(r"time=(\d+):(\d+):(\d+\.\d+)", line)
-            if tm:
-                h, m, s = tm.groups()
-                sec = int(h) * 3600 + int(m) * 60 + float(s)
-                frac = min(1.0, sec / dur)
-                if on_tick:
-                    on_tick(frac, is_copy_only)
+                if line.strip():
+                    ultimas.append(line.strip())
+                    del ultimas[:-12]
+                tm = re.search(r"time=(\d+):(\d+):(\d+\.\d+)", line)
+                if tm:
+                    h, m, s = tm.groups()
+                    sec = int(h) * 3600 + int(m) * 60 + float(s)
+                    frac = min(1.0, sec / dur)
+                    if on_tick:
+                        on_tick(frac, is_copy_only)
 
-        process.wait()
-        data["process_handle"] = None
+            process.wait()
+            data["process_handle"] = None
+            return abortado, process.returncode, ultimas
+
+        aborted, codigo, ultimas = _correr(cmd_subs or cmd)
+        # Si los subtítulos no se pudieron incrustar, el video se guarda igual sin ellos
+        if (cmd_subs and not aborted and not should_abort()
+                and (codigo != 0 or not os.path.exists(tmp_out))):
+            print(f"[Subtítulos] No se pudieron incrustar ({self._vid_linea_error(ultimas)[:80]}); "
+                  f"se guarda sin subtítulos.")
+            _borrar(tmp_out)
+            aborted, codigo, ultimas = _correr(cmd)
 
         # --- CANCELADO A MEDIA CONVERSIÓN: se descarta lo incompleto ---
         if aborted or should_abort():
             _borrar(tmp_out)
             return False
-        if process.returncode != 0 or not os.path.exists(tmp_out):
+        if codigo != 0 or not os.path.exists(tmp_out):
             _borrar(tmp_out)
             raise Exception(f"FFmpeg falló: {self._vid_linea_error(ultimas)[:60]}")
 
@@ -19250,6 +23467,12 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
                             "-c", "copy",
                             "-disposition:v:1", "attached_pic"
                         ])
+                    elif ext_final == "mkv":
+                        # MKV: la carátula va como adjunto "cover.jpg" (así la muestran
+                        # VLC, MPC, Kodi y las miniaturas del Explorador con extensiones)
+                        tc = ["ffmpeg", "-y", "-i", tmp_out, "-map", "0", "-c", "copy",
+                              "-attach", thumb_path, "-metadata:s:t", "mimetype=image/jpeg",
+                              "-metadata:s:t", "filename=cover.jpg"]
                     else:
                         raise ValueError(f"Carátula no soportada para .{ext_final}")
 
@@ -19259,26 +23482,35 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
                         tc,
                         startupinfo=self.get_startup_info(),
                         stdout=subprocess.DEVNULL,
-                        stderr=subprocess.DEVNULL
+                        stderr=subprocess.PIPE
                     )
                     data["process_handle"] = proc_cover
                     try:
-                        rc_cover = proc_cover.wait()
+                        _, err_cover = proc_cover.communicate()
+                        rc_cover = proc_cover.returncode
                     finally:
                         data["process_handle"] = None
                     if rc_cover != 0:
-                        raise RuntimeError(f"FFmpeg código {rc_cover}")
+                        lineas = [l.strip() for l in (err_cover or b"").decode("utf-8", "replace").splitlines()
+                                  if l.strip()]
+                        raise RuntimeError(f"FFmpeg código {rc_cover}: "
+                                           f"{self._vid_linea_error(lineas) if lineas else 'sin detalle'}")
                     os.replace(thumb_tmp, tmp_out)
 
             except Exception as _te:
                 if not should_abort():
-                    print(f"[Metadatos] Carátula omitida (no fatal): {str(_te)[:120]}")
+                    print(f"[Metadatos] Carátula omitida (no fatal): {str(_te)[:200]}")
+                    self._yt_nota(data, " · sin carátula")
                 _borrar(thumb_path, thumb_tmp)
 
         # Cancelado mientras se incrustaba la carátula: no se entrega nada
         if should_abort():
             _borrar(tmp_out)
             return False
+
+        # --- LETRA (YouTube Music, modo Video): en la etiqueta de letra del MP4 ---
+        if letra and letra[1] and mode != "Audio" and ext_final == "mp4":
+            self._yt_etiqueta_letra(tmp_out, ext_final, letra[1])
 
         # --- ENTREGA: el archivo aparece en el destino ya completo ---
         ultimo_err = None
@@ -19489,13 +23721,22 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
 
             # --- A. OBTENER METADATOS DEL ITEM (solo si embed_meta activado) ---
             yt_meta = {}
-            if embed_meta:
+            full_info = None
+            crudo_item = []         # si se analiza (metadatos o subtítulos), la descarga lo reutiliza
+            con_letra = bool(data.get("cfg_letras") and mode != "Audio" and _yt_es_ytmusic(data.get("url")))
+            pistas_cfg = data.get("cfg_pistas", "original")
+            if embed_meta or data.get("cfg_subs") == "preguntar" or con_letra or pistas_cfg != "original":
                 try:
                     meta_opts = {'quiet': True, 'no_warnings': True, 'socket_timeout': 15}
                     meta_opts.update(_yt_opts_robustos())
-                    with yt_dlp.YoutubeDL(meta_opts) as ydl_m:
-                        full_info = ydl_m.extract_info(item_url, download=False)
-                    yt_meta = self._yt_build_meta(full_info, item_title_raw, item_url)
+                    full_info = self._yt_extraer_info(
+                        meta_opts, item_url,
+                        lambda: data["cancel_flag"] or data["status"] in ("cancelled", "paused"),
+                        crudo_out=crudo_item, solo_audio=(mode == "Audio"))
+                    if embed_meta:
+                        yt_meta = self._yt_build_meta(full_info, item_title_raw, item_url)
+                except _YtDetenido:
+                    return None
                 except Exception as me:
                     print(f"[Playlist] Metadatos no obtenidos (item {item_index}): {me}")
 
@@ -19511,14 +23752,44 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
             ydl_opts.update(_yt_opts_robustos())
             ydl_opts.update(_yt_opts_diagnostico())
 
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                ydl.download([item_url])
+            # "Preguntarme": la primera vez se abre la ventana; el resto usa lo mismo
+            subs_item = data.get("cfg_subs") if mode != "Audio" else None
+            if full_info and "preguntar" in (pistas_cfg, subs_item):
+                self._yt_soltar_turno(turno)
+                turno = None
+                pistas_cfg, subs_item = self._yt_preguntar(data, full_info, mode, pistas_cfg,
+                                                           subs_item, lista=True)
+                turno = self._yt_tomar_turno(data, texto_estado)
+            if subs_item == "preguntar":
+                subs_item = None
+            # Idiomas de audio (⚙️ Configuración), según lo que tiene ESTE video
+            if full_info:
+                pistas = _yt_plan_pistas(full_info, pistas_cfg, modo_audio=(mode == "Audio"))
+                if pistas and mode != "Audio":
+                    ydl_opts['format'] = _yt_formato_video(limit_height, full_info, pistas)
+                    if len(pistas) > 1:
+                        ydl_opts['allow_multiple_audio_streams'] = True
+                elif pistas:
+                    ydl_opts['format'] = _yt_formato_audio(full_info, pistas)
+
+            with _yt_ydl(ydl_opts, data.get("cfg_codec")) as ydl:
+                captura = _yt_capturar_info(ydl)
+                self._yt_bajar(ydl, item_url, crudo_item[0] if crudo_item else None, data,
+                               carpeta=temp_dir, duracion=(full_info or {}).get("duration"))
 
             # Ya bajó: el turno queda libre mientras este convierte / empaqueta
             self._yt_soltar_turno(turno)
 
             if data["status"] in ["cancelled"] or data["cancel_flag"]:
                 return None
+
+            # Subtítulos (⚙️ Configuración): aparte, si fallan el video sale igual
+            if subs_item:
+                self._yt_bajar_subtitulos(item_url, temp_dir, safe_title, subs_item,
+                                          crudo=crudo_item[0] if crudo_item else None)
+            letra = None
+            if con_letra and full_info:
+                letra = _letra_para_incrustar(full_info, log=lambda m: print(f"[Letra] {m.strip()}"))
 
             # --- D-G. CONVERTIR/REMUXEAR + METADATA + CARÁTULA ---
             # (helper compartido con la descarga individual: mismo armado de
@@ -19533,6 +23804,8 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
                 temp_dir=temp_dir, final_path=final_path, ext_final=ext_final,
                 mode=mode, container=container, audio_mode=audio_mode,
                 embed_meta=embed_meta, yt_meta=yt_meta, data=data,
+                letra=letra,
+                pistas_audio=_yt_pistas_bajadas(captura.get("info")),
                 should_abort=_item_should_abort, on_tick=_item_on_tick,
             )
 
@@ -19620,6 +23893,7 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
             # que el hilo de descarga haya dejado pendiente y no lo pisa
             self._en_ui(data["lbl_status"].configure, text="Pausado", text_color="orange")
             data["btn_pause"].configure(text="▶", fg_color="#27AE60", hover_color="#2ECC71")
+            self._yt_soltar_turno(data.get("_turno"))   # su lugar pasa a la siguiente ya
             self._yt_despertar_cola()   # si estaba en cola, sale de la fila ya
         elif data["status"] == "paused":
             data["status"] = "active"
@@ -19634,20 +23908,63 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
     def cancel_single_yt(self, task_id):
         if task_id in self.yt_downloads:
             data = self.yt_downloads[task_id]
+            estaba = data["status"]
             data["status"] = "cancelled"
             data["cancel_flag"] = True
             data["lbl_status"].configure(text="Cancelado", text_color="red")
 
-            # NUEVO: Matar el proceso específico de esta tarea si existe
-            if "process_handle" in data and data["process_handle"]:
-                try:
-                    data["process_handle"].kill()
-                except:
-                    pass
+            # Su lugar en la cola se libera YA. Antes seguía ocupado hasta que el
+            # hilo terminaba de analizar o de bajar, y la cola quedaba trabada con
+            # descargas canceladas que ya ni se veían.
+            self._yt_soltar_turno(data.get("_turno"))
 
-            data["frame"].pack_forget() # Ocultar
+            # Matar el proceso de esta tarea (FFmpeg / spotDL y lo que haya lanzado)
+            proc = data.get("process_handle")
+            if proc:
+                threading.Thread(target=_proc_matar_arbol, args=(proc,), daemon=True).start()
+
+            # Pausada: su hilo ya terminó y había dejado la carpeta temporal para reanudar
+            if estaba == "paused":
+                self._yt_borrar_temporal(task_id)
+
             self._yt_despertar_cola()   # si estaba en cola, deja su lugar ya
-            self.update_global_progress()
+            self._yt_quitar_de_lista(task_id)   # se borra de verdad (antes solo se ocultaba)
+
+    def _yt_quitar_de_lista(self, task_id):
+        """
+        Saca una descarga de la cola y destruye sus widgets (antes solo se ocultaba
+        y quedaba en memoria toda la sesión). Si su hilo sigue vivo (terminando
+        de cortar algo), se oculta ya y se borra en cuanto ese hilo termine.
+        """
+        data = self.yt_downloads.get(task_id)
+        if data is None:
+            return
+        hilo = data.get("thread")
+        if hilo is not None and hilo.is_alive():
+            try:
+                data["frame"].pack_forget()
+            except Exception:
+                pass
+            if not data.get("_quitar_programado"):
+                data["_quitar_programado"] = True
+
+                def _reintentar():
+                    data["_quitar_programado"] = False
+                    self._yt_quitar_de_lista(task_id)
+                self.after(1000, _reintentar)
+            return
+        self.yt_downloads.pop(task_id, None)
+        try:
+            data["frame"].destroy()
+        except Exception:
+            pass
+        self.update_global_progress()
+
+    def _yt_limpiar_terminadas(self):
+        """Quita de la cola las descargas terminadas, con error, omitidas o canceladas."""
+        for task_id, data in list(self.yt_downloads.items()):
+            if data.get("status") in ("finished", "error", "skipped", "cancelled"):
+                self._yt_quitar_de_lista(task_id)
 
     def cancel_all_yt(self):
         for task_id in list(self.yt_downloads.keys()):
@@ -19969,6 +24286,10 @@ if __name__ == "__main__":
                 configurar_deno_local()  # Solo detecta/registra Deno si ya existe; no descarga nada aquí.
             except Exception as e:
                 print(f"Error en setup inicial deno_local {e}")
+
+            # Tier-2 (CUDA / faster-whisper / yt-dlp) arranca YA, mientras se arma la
+            # ventana principal (antes esperaba a que App() terminara)
+            _iniciar_tier2()
 
             # --- FASE 2: CONSTRUIR APP (oculta y transparente) ---
             app = App()

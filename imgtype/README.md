@@ -14,9 +14,10 @@ Para conocer los cambios incluidos en esta versión, consulta el archivo `CHANGE
 
 ## Descarga
 
-**[Descargar DEUS MACHINA | TOOLS 3.0](https://drive.google.com/drive/u/2/folders/1Ndj1H-xpfA5u2HEyzgYfJhcuceup3xqK)**
+El instalador (~1.7 GB) está en dos lugares; es el mismo archivo en ambos:
 
-> El instalador se aloja fuera del repositorio por su tamaño.
+- **[Descargar desde GitHub Releases](https://github.com/DoMiNaTh0R/DEUS-MACHINA-TOOLS/releases/latest)**
+- **[Descargar desde Google Drive](https://drive.google.com/drive/folders/1Vr5GbW31KSOUGScupc5S8DhU_w5zGrFb)** (espejo)
 
 **Código fuente:** https://github.com/DoMiNaTh0R/DEUS-MACHINA-TOOLS
 
@@ -27,9 +28,10 @@ Para conocer los cambios incluidos en esta versión, consulta el archivo `CHANGE
 - **Varios módulos a la vez:** puedes convertir un video mientras comprimes imágenes y descargas de YouTube. Los módulos que cargan modelos de IA (OCR, Transcripción y Quitar fondo) se turnan automáticamente para no saturar la memoria.
 - **OCR nuevo:** PaddleOCR (GPU/CPU) y RapidOCR en lugar de EasyOCR, con el motor en un proceso aparte, decisión página por página en PDF mixtos y lectura a 200 DPI.
 - **Metadata Lab:** lectura, edición, limpieza y verificación de metadatos en imágenes, audio, video, PDF y documentos de Office, sin recomprimir el archivo.
-- **Video:** detección real de lo que soporta tu GPU (NVENC H.264/H.265/AV1, 10 bits, NVDEC, ruta completa en GPU) y niveles de calidad calibrados por códec.
-- **Descargas:** soporte de Spotify (vía spotDL), cola de 3 descargas simultáneas y actualizador de yt-dlp con verificación SHA-256.
-- **Transcripción:** selector de idioma (incluido modo multilingüe), traducción al inglés y modo en vivo que ya no pierde audio.
+- **Video:** detección real de lo que soporta tu GPU (NVENC H.264/H.265/AV1, 10 bits, NVDEC, ruta completa en GPU) niveles de calidad calibrados por códec y soporte de archivos con varias pistas de audio y subtítulos (eliges cuáles conservar).
+- **Descargas:** soporte de Spotify (vía spotDL, sin esperar en la cola), cola de 3 descargas simultáneas para YouTube y demás sitios, ⚙️ configuración (códec preferido, pista de audio de videos doblados, subtítulos dentro del video y letra de canciones de YouTube Music) y actualizador de yt-dlp con verificación SHA-256.
+- **Transcripción:** selector de idioma (incluido modo multilingüe), traducción al inglés, modo en vivo que ya no pierde audio, enlaces de Spotify en YouTube → Texto y una pestaña nueva para bajar **subtítulos** de videos y **letras de canciones** (solas o con tiempos) sin usar IA.
+- **Botón "🧹 Liberar modelo IA"** en el menú, Transcripción, OCR y Quitar fondo: saca de la memoria el modelo de IA cargado.
 - **Renombrador:** deshacer el último renombrado completo, incluso después de cerrar la app.
 - **Arranque más rápido y ejecutable más ligero:** la app ya no carga PyTorch; usa solo las librerías de NVIDIA necesarias.
 
@@ -103,7 +105,8 @@ Las ejecuciones posteriores no requieren descarga.
 La app no requiere conexión permanente a internet. Las únicas situaciones en las que se realiza una conexión son:
 
 - Descarga de un modelo o componente por primera vez (ver la tabla anterior).
-- Descarga de contenido desde YouTube, Spotify u otras plataformas compatibles.
+- Descarga de contenido desde YouTube, Spotify u otras plataformas compatibles (incluidos subtítulos).
+- Búsqueda de letras de canciones (LRCLIB, YouTube Music y otros proveedores), solo cuando usas esa opción.
 - Actualización de yt-dlp desde el botón integrado en la app (con verificación de firma SHA-256).
 
 ---
@@ -238,9 +241,10 @@ For a list of changes included in this version, refer to the `CHANGELOG.md` file
 
 ## Download
 
-**[Download DEUS MACHINA | TOOLS 3.0](https://drive.google.com/drive/u/2/folders/1Ndj1H-xpfA5u2HEyzgYfJhcuceup3xqK)**
+The installer (~1.7 GB) is available in two places; it is the same file in both:
 
-> The installer is hosted externally due to its file size.
+- **[Download from GitHub Releases](https://github.com/DoMiNaTh0R/DEUS-MACHINA-TOOLS/releases/latest)**
+- **[Download from Google Drive](https://drive.google.com/drive/folders/1Vr5GbW31KSOUGScupc5S8DhU_w5zGrFb)** (mirror)
 
 **Source code:** https://github.com/DoMiNaTh0R/DEUS-MACHINA-TOOLS
 
@@ -251,9 +255,10 @@ For a list of changes included in this version, refer to the `CHANGELOG.md` file
 - **Several modules at once:** convert a video while compressing images and downloading from YouTube. Modules that load AI models (OCR, Transcription and Background Removal) take turns automatically so memory never saturates.
 - **New OCR:** PaddleOCR (GPU/CPU) and RapidOCR instead of EasyOCR, with the engine in a separate process, page-by-page decisions in mixed PDFs and reading at 200 DPI.
 - **Metadata Lab:** read, edit, clean and verify metadata in images, audio, video, PDF and Office documents, without recompressing the file.
-- **Video:** real detection of what your GPU supports (NVENC H.264/H.265/AV1, 10-bit, NVDEC, full-GPU pipeline) and quality levels calibrated per codec.
-- **Downloads:** Spotify support (via spotDL), a 3-download queue and a yt-dlp updater with SHA-256 verification.
-- **Transcription:** language selector (including multilingual mode), translation to English and a live mode that no longer drops audio.
+- **Video:** real detection of what your GPU supports (NVENC H.264/H.265/AV1, 10-bit, NVDEC, full-GPU pipeline) quality levels calibrated per codec and support for files with several audio tracks and subtitles (you choose which ones to keep).
+- **Downloads:** Spotify support (via spotDL, without waiting in the queue), a 3-download queue for YouTube and other sites, ⚙️ settings (preferred codec, audio track for dubbed videos, subtitles inside the video and YouTube Music song lyrics) and a yt-dlp updater with SHA-256 verification.
+- **Transcription:** language selector (including multilingual mode), translation to English, a live mode that no longer drops audio, Spotify links in YouTube → Text and a new tab to download video **subtitles** and **song lyrics** (plain or timed) without AI.
+- **"🧹 Free AI model" button** in the menu, Transcription, OCR and Background Removal: unloads the AI model from memory.
 - **Renamer:** undo the last full rename, even after closing the app.
 - **Faster startup, lighter executable:** the app no longer loads PyTorch; it only uses the required NVIDIA libraries.
 
@@ -327,7 +332,8 @@ Subsequent runs do not require a download.
 The app does not require a permanent internet connection. The only situations in which a connection is made are:
 
 - Downloading a model or component for the first time (see the table above).
-- Downloading content from YouTube, Spotify or other supported platforms.
+- Downloading content from YouTube, Spotify or other supported platforms (subtitles included).
+- Looking up song lyrics (LRCLIB, YouTube Music and other providers), only when you use that option.
 - Updating yt-dlp via the built-in button in the app (with SHA-256 signature verification).
 
 ---

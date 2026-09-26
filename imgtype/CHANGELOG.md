@@ -13,7 +13,7 @@
 
 La 3.0 es un salto grande: el **OCR se rehízo desde cero** (ahora PaddleOCR/RapidOCR en vez de EasyOCR, con motor en un proceso aparte, decisión página por página y lectura a 200 DPI), el **editor de metadatos** pasó de "borrar etiquetas" a un laboratorio completo que lee, edita, limpia y **verifica** imágenes, audio, video, PDF y documentos de Office sin recomprimir nada, y el **convertidor de video** ahora prueba de verdad qué puede hacer tu tarjeta (NVENC H.264/H.265/AV1, 10 bits, NVDEC, ruta 100 % en GPU) en vez de asumirlo.
 
-Además la app ya **no carga PyTorch** (solo usa las DLL de NVIDIA): arranca más rápido y el ejecutable pesa muchísimo menos. Ahora puedes **usar varios módulos a la vez** —convertir un video mientras comprimes imágenes y bajas de YouTube— y lo que usa modelos de IA se turna solo para no saturar la memoria. Se suman **descargas de Spotify**, **cola de 3 descargas**, **deshacer el último renombrado**, **idioma y modo multilingüe en transcripción**, y una regla que ahora vale para toda la app: **nada sobrescribe tus archivos** (si el nombre existe, se guarda como `archivo (1)`).
+Además la app ya **no carga PyTorch** (solo usa las DLL de NVIDIA): arranca más rápido y el ejecutable pesa muchísimo menos. Ahora puedes **usar varios módulos a la vez** —convertir un video mientras comprimes imágenes y bajas de YouTube— y lo que usa modelos de IA se turna solo para no saturar la memoria. Se suman **descargas de Spotify**, **cola de 3 descargas**, **subtítulos y letras de canciones**, **deshacer el último renombrado**, **idioma y modo multilingüe en transcripción**, y una regla que ahora vale para toda la app: **nada sobrescribe tus archivos** (si el nombre existe, se guarda como `archivo (1)`).
 
 Además, **el programa pasa a ser software libre bajo licencia AGPL-3.0**: su código fuente está publicado en https://github.com/DoMiNaTh0R/DEUS-MACHINA-TOOLS.
 
@@ -63,13 +63,19 @@ El módulo pasó de "borrar etiquetas" a un laboratorio completo:
 - **Detección real de capacidades:** la app prueba de verdad qué acepta tu FFmpeg y tu tarjeta — **NVENC H.264 / H.265 / AV1**, **10 bits**, **NVDEC** (decodificar en GPU) y la ruta **100 % en GPU** (decodificar, escalar y codificar sin bajar a la RAM) — y elige las mejores opciones que tu equipo soporta, en vez de asumir que existen.
 - **Niveles de calidad calibrados** por códec (5 niveles en "Reducir tamaño") y modo "visualmente idéntico" en "Convertir formato", cada uno con su CRF/CQ ajustado por encoder (incluido **SVT-AV1** en CPU).
 - **Selector de resolución** (Original, 1440p, 1080p, 720p, 480p) con escalado en GPU cuando se puede.
+- **Pistas de audio y subtítulos:** **Convertir** y **Reducir tamaño** preguntan qué pistas de audio y qué subtítulos conservar cuando hay algo que elegir (varias pistas, o subtítulos que caben en el formato de salida). Convertir marca todo de entrada (antes quedaba una sola pista y los subtítulos se perdían salvo el primero en MKV); Reducir tamaño marca solo el audio principal y ningún subtítulo, para que pese menos, pero siempre deja marcar más, con botones **Todas / Principal** y **Todos / Ninguno**. En MP4 y MOV los subtítulos de texto quedan como pistas que se activan en el reproductor, con su nombre (los de imagen, PGS/DVD, solo caben en MKV); en MKV pasan tal cual, con las fuentes que usan los ASS. **Extraer audio** deja elegir una o varias pistas (un archivo por pista, con el idioma en el nombre). Con «Usar la misma elección en los demás archivos» no vuelve a preguntar en esa lista.
 - **Audio inteligente por contenedor:** si la pista ya es compatible se copia tal cual en vez de recodificarla.
 - **Errores legibles:** si FFmpeg falla, el resumen muestra la línea útil del error, no el volcado completo.
 
-### 5.- Descargas: Spotify, cola de 3 y actualizador verificado
+### 5.- Descargas: Spotify, cola de 3, configuración y actualizador verificado
 
-- **Spotify:** pegar un enlace de canción, álbum, playlist o artista descarga el audio vía **spotDL**, con el mismo flujo que YouTube (aviso de lista, subcarpeta, progreso por canción y preguntas cada 50).
-- **Cola de 3 descargas:** bajan tres a la vez y las demás esperan mostrando **"⏳ En cola (#2)"**, en orden de llegada. En cuanto una termina de bajar y pasa a convertir o empaquetar, **arranca la siguiente**.
+- **Spotify:** pegar un enlace de canción, álbum, playlist o artista descarga el audio vía **spotDL**, con el mismo flujo que YouTube (aviso de lista, subcarpeta, progreso por canción y preguntas cada 50). Va **por fuera de la cola** (no espera ni frena a las de YouTube), baja **hasta 3 canciones a la vez** y el paso "Analizando" es mucho más rápido. En modo Video guarda el audio en **M4A original** (la mejor calidad, sin recomprimir) en vez de MP3; en modo Audio usa el formato elegido.
+- **Cola de 3 descargas:** bajan tres a la vez y las demás esperan mostrando **"⏳ En cola (#2)"**, en orden de llegada. En cuanto una termina de bajar y pasa a convertir o empaquetar, **arranca la siguiente**. Cancelar o pausar **libera su lugar al instante**, aunque esté en "Analizando…".
+- **⚙️ Configuración del descargador** (se guarda sola): **códec preferido** H.264 (por defecto) o H.265 — VP9.2, AV1 y VP9 siguen primero cuando el video los tiene; la opción solo decide el orden entre H.264 y H.265, sin retrasar la descarga ni bajar nunca la resolución —; **pista de audio** para videos doblados: original (por defecto), inglés, español, ambas o **Preguntarme** (al descargar se abre una ventana con los idiomas del video —muchos traen decenas de doblajes—, con botones **Todas / Original**; si el elegido no está, queda el original; cada pista lleva su idioma y nombre para elegirla en el reproductor; en modo Audio se guarda una sola); **subtítulos dentro del video**: no (por defecto), español, inglés, ambos o **Preguntarme** (al descargar se abre una ventana con todos los idiomas que subió el autor para marcar los que quieras, con **Todos / Ninguno**; nunca los automáticos; quedan como pista seleccionable, no pegados a la imagen; en una playlist se pregunta una sola vez), **letra de la canción** (solo enlaces de YouTube Music, nunca Spotify, y solo en modo Video; apagada por defecto: busca la letra en LRCLIB, YouTube Music y otros y la incrusta como pista «Letra» si tiene tiempos y en la etiqueta de letra del video; si no aparece, se descarga igual, sin letra) y el aviso de Spotify. La **carátula** ahora también se incrusta en **MKV** (como adjunto `cover.jpg`) y en MP4 las pistas de subtítulos muestran su nombre (Español, Letra…) en el reproductor; si alguna vez no se puede incrustar, el estado final lo dice («sin carátula») y la consola muestra el motivo. El resumen de lo elegido se ve al pie de esa ventana, y **«Incluir Metadatos»** también se recuerda.
+- **TikTok:** se baja siempre el video **con su audio real**, también en modo Audio (antes podía salir la pista de música del video en vez de lo que se escucha).
+- **YouTube más rápido:** cada video se analiza **una sola vez** (antes dos, o tres con subtítulos): la descarga reutiliza ese análisis y ahorra 1–2 s por video.
+- **Videos con dos ediciones:** algunos videos editados después de subirse tienen dos versiones (por ejemplo 964 s y 947 s) y, según la sesión, YouTube entrega de la anterior todo (video, audio y doblajes) o una parte (solo los formatos DASH, o solo los HLS con sus doblajes), aunque la página y los subtítulos sean de la actual. La app lo detecta por la duración que declara cada formato (la del audio HLS no es confiable: se toma la de los videos de su misma lista) y vuelve a pedir el video con una sesión nueva (~1 s cada vez, hasta 8 veces) hasta recibir completa la edición actual, la que se ve en YouTube. Si nunca llega, baja una sola edición —nunca el video de una con el audio o los doblajes de la otra— y lo avisa («⚠️ dura 947 s (YouTube dice 964 s)»). Además, si YouTube corta una descarga a mitad (error 403), se baja desde cero en vez de retomar lo bajado a medias con enlaces nuevos. Con un enlace de YouTube, la letra con tiempos sale primero de YouTube Music, que está sincronizada con ese mismo video (la de LRCLIB es la del álbum y podía correrse).
+- **"🧹 Limpiar terminadas":** quita de la cola las descargas terminadas, con error o canceladas. Las canceladas ahora se borran de verdad (antes solo se ocultaban y seguían ocupando memoria).
 - **Deno automático:** la app descarga el runtime de JavaScript que yt-dlp necesita para resolver los retos de YouTube (una sola vez, del release oficial), lo que evita muchos fallos de descarga.
 - **Actualizador de yt-dlp verificado:** comprueba la **firma SHA-256** que publica PyPI antes de instalar; si no coincide, no instala nada y conserva la versión que funcionaba. Además la versión actualizada se carga sin reinstalar la app.
 
@@ -80,6 +86,10 @@ El módulo pasó de "borrar etiquetas" a un laboratorio completo:
 - **Traducir al inglés** con una casilla, en Archivos y en YouTube → Texto.
 - **En vivo:** ya no se pierde audio mientras el modelo transcribe (se graba en paralelo), el idioma se fija tras la primera detección confiable y, al detener, el modelo **queda en memoria** para volver a grabar al instante.
 - **Sin WAV intermedios:** el audio se decodifica directo a memoria a 16 kHz, así que transcribir es más rápido y no deja archivos sueltos.
+- **YouTube → Texto acepta enlaces de Spotify** (spotDL busca la canción en YouTube) y descarga Deno si hace falta. En TikTok transcribe el audio real del video.
+- **"⚡ Modo rápido"** (Archivos y YouTube → Texto, se guarda): transcribe varios trozos de voz a la vez. Con GPU, 6 minutos de voz pasaron de 21 s a ~4 s con el mismo texto; en CPU, casi el doble de rápido. Los subtítulos siguen saliendo en renglones normales. En YouTube → Texto el registro dice si está activado.
+- **Nueva pestaña "Subtítulos y Letras":** baja los **subtítulos** de un video (YouTube y otros sitios) sin descargar el audio ni usar IA, en **.srt, .vtt o .txt**, y la **letra de una canción** (YouTube, YouTube Music o Spotify, incluso álbumes y playlists) **sola (.txt) o con tiempos (.lrc)**, buscando en **LRCLIB**, **YouTube Music** y otros proveedores. Un solo botón, **🔍 Buscar y descargar**: en Subtítulos abre una ventana para marcar uno o varios idiomas (un archivo por idioma; los automáticos de YouTube salen limpios, sin líneas repetidas) y en Letra baja directo. Los subtítulos que pintan a cada persona de un color se guardan como **solo texto** (por defecto), con **"Persona 1:", "Persona 2:"…** u **originales** (siempre con sus tiempos; la elección se recuerda). Las letras en .txt salen **con las estrofas separadas** (si una fuente las da todas juntas, se busca en otra). **Acepta listas**: playlists y álbumes de YouTube y YouTube Music (y de otros sitios), además de los de Spotify. Como en YouTube Downloader, pregunta si se descarga la lista (si el enlace es de un video dentro de una lista, se puede bajar solo ese video); las de más de 25 van **de 25 en 25** y al terminar cada tanda pregunta si sigue; y entre un elemento y otro hay una **pausa** (2 a 5 s entre videos, 1 a 2,5 s entre letras) para no saturar al sitio. En subtítulos, los idiomas se eligen en el primer video y se usan en todos (cada lista va en su propia carpeta). Al empezar, el enlace se borra del campo. El registro va con colores y termina con un resumen tipo **"Terminado: 10/10 letras guardadas con éxito"**. Si algo falla, lo dice en pantalla y en el registro, sin cerrarse.
+- **Archivos con varias pistas de audio** (películas, videos doblados): si el archivo trae más de una, la transcripción pregunta cuál transcribir; si trae una sola, ni pregunta.
 
 ### 7.- Renombrador: deshacer el último renombrado
 
@@ -99,6 +109,10 @@ Con **"Forzar A4"** se elige **150 o 300 DPI**. Ese valor es un **techo, no una 
 
 Si cierras la app mientras algo trabaja, se listan los trabajos en marcha y se pide confirmación. Al aceptar, se cierran de verdad los procesos externos (FFmpeg, Ghostscript, yt-dlp, spotDL) y los motores de IA.
 
+### 11.- Botón "🧹 Liberar modelo IA"
+
+En el menú principal, Transcripción, OCR y Quitar fondo: saca de la memoria el modelo de IA que esté cargado (Whisper, OCR o el de quitar fondo). Si algo lo está usando (o espera turno), lo libera en cuanto termina el último trabajo.
+
 ---
 
 ## 🛠️ Mejoras
@@ -107,7 +121,9 @@ Si cierras la app mientras algo trabaja, se listan los trabajos en marcha y se p
 
 - **Sin PyTorch:** la app ya no importa PyTorch para detectar la GPU ni para CUDA; usa solo las DLL de NVIDIA (CUDA 12.9 / cuDNN 9.10) y consultas ligeras a la tarjeta (NVML). **El ejecutable pesa muchísimo menos y arranca más rápido.**
 - **La detección de NVENC/GPU ya no se repite en cada arranque:** se mide la primera vez que entras al módulo de video y queda guardada en disco, con la firma de FFmpeg + GPU + driver. Si cambia cualquiera de los tres, se vuelve a medir sola; y hay un botón **"↻ Re-detectar"** para forzarlo a mano.
-- **Quitar fondo precarga sus librerías** al abrir su pestaña, así al pulsar el botón ya no hay espera.
+- **Quitar fondo precarga sus librerías** al abrir su pestaña, así al pulsar el botón ya no hay espera. Si falta el modelo (176 MB), empieza a bajarlo **en paralelo** y muestra el avance real.
+- **Arranque más fluido:** las librerías pesadas empiezan a cargar mientras se arma la ventana, y la preparación de pantallas en segundo plano **se pausa mientras usas la app** (antes podía trabarla medio segundo cada vez). La lista de micrófonos y el ícono de las ventanas ya no se calculan en el hilo de la interfaz, y las ventanas secundarias (Acerca de, Licencias, ⚙️ Configuración…) se preparan —y se dibujan, sin que se vean— solo mientras la app está quieta, así abren al instante ya completas, también la primera vez.
+- **Imágenes y PDF en paralelo:** convertir o comprimir imágenes procesa 2 o 3 a la vez según el procesador (12 fotos: de 11.8 s a 4.5 s) y comprimir PDF corre 3 Ghostscript a la vez (tardan casi lo mismo que uno solo). El resumen sale en el orden de la lista y dos archivos con el mismo nombre de salida no se pisan.
 - **Temporales ordenados:** todo lo temporal (app, FFmpeg, yt-dlp, motor OCR) va a una carpeta por sesión dentro de `%TEMP%\DeusMachinaTools` que se limpia al salir, incluidos los restos de sesiones anteriores que se cerraron mal.
 - **Un solo modelo de IA en memoria:** un gestor libera el modelo que no se usa (al cargar otro o tras 20 minutos sin uso).
 
@@ -125,6 +141,10 @@ Si cierras la app mientras algo trabaja, se listan los trabajos en marcha y se p
 - **Ventanas secundarias reutilizables:** las ventanas de resumen, licencias, ayuda y avisos se crean ocultas y ya dibujadas, así aparecen de golpe y centradas (sin parpadeo), con la barra de título en oscuro en Windows.
 - **Textos correctos:** plurales bien formados (`1 pág.` / `70 págs.`, `1 archivo` / `5 archivos`).
 - **Orden de los controles** en YouTube → Texto igual que en Archivos: Modelo IA · Traducir al inglés · Formato · Idioma.
+- **Transcripción con bloques parejos:** Archivos, YouTube → Texto y Subtítulos y Letras tienen ahora todos los bloques del mismo ancho. YouTube → Texto suma el **reloj** de Archivos (dorado mientras trabaja, verde con el total), el registro con colores, **de solo lectura**, más alto y con barra para deslizar (si subes a leer, las líneas nuevas no te bajan al final), y **Copiar / Limpiar arriba** de la consola (antes los botones de abajo se cortaban).
+- **YouTube Downloader:** el resumen gris ("H.264 · sin subtítulos") pasó al pie de ⚙️ Configuración (y ya no se ve raro un instante al cambiar una opción), la tarjeta de subtítulos ya no parece trabada (los idiomas aparecen solo al activarlos) y **"🧹 Limpiar terminadas"** ya no corta la última letra.
+- **Ventanas de pistas y subtítulos más ligeras:** las de YouTube, Transcripción, Subtítulos y Letras y el Convertidor de video dibujan toda la lista de una vez: abren ya armadas y se deslizan sin que los textos se desacomoden (antes, con muchas opciones, se armaban a pedazos y al deslizar los textos se veían mal). Todas tienen botones para marcar de un clic: **Todas / Ninguna**, o **Todas / Original** (**Principal** en tus archivos) donde hay que quedarse con una como mínimo.
+- **Pestañas sin bordes grises:** con Windows escalado (125 %, 150 %) las pestañas y los botones segmentados (PDF, Video, Imágenes, ⚙️ Configuración…) mostraban una rayita y piquitos grises en las orillas; ahora se dibujan a su tamaño exacto.
 - **Estado de la tarjeta de OCR centrado** (GPU detectada / "En memoria ✓").
 
 ---
@@ -177,6 +197,26 @@ En pantallas con escala de Windows al 125 %, los textos de las tarjetas se corta
 
 Cerrar con una conversión o descarga en curso dejaba FFmpeg, yt-dlp o el motor OCR trabajando en segundo plano. Ahora se cierran todos.
 
+### 12.- TikTok: videos que no se descargaban
+
+Algunos TikTok fallaban en el descargador: se elegía un H.265 "solo video" que a veces ni descarga y se le pegaba la pista de música del video. Ahora se baja el video con su propio audio, en la mejor resolución.
+
+### 13.- Descargas canceladas que trababan la cola
+
+Cancelar mientras decía "Analizando…" no detenía nada: la descarga seguía ocupando su lugar (aunque ya no se viera) y las siguientes se quedaban esperando. Ahora el lugar se libera al instante y se cierran también los procesos hijos (el FFmpeg de spotDL).
+
+### 14.- Ventanas negras que aparecían y se cerraban
+
+En la app compilada, cada programa de consola que se lanzaba abría una ventana negra por un instante: FFmpeg al convertir de Spotify, el Deno con el que yt-dlp resuelve los retos de YouTube (descargas y Subtítulos y Letras) y el `where ccache` que corre PaddlePaddle cada vez que se carga el motor del OCR. Ahora todos se lanzan sin ventana, en la app y en sus procesos aparte (motor OCR, spotDL).
+
+### 15.- Quitar fondo decía "Descargando" siempre
+
+Buscaba el modelo en otra carpeta y avisaba que lo estaba descargando aunque ya estuviera bajado.
+
+### 16.- Imágenes a PDF: mensaje final larguísimo
+
+El resumen de DPI ahora va en una segunda línea corta (por ejemplo `2 reducidas a 300 DPI · 3 ya bajo 300 DPI (mín. 72)`).
+
 ---
 
 ## ⚙️ Cambios Internos
@@ -207,7 +247,7 @@ Cerrar con una conversión o descarga en curso dejaba FFmpeg, yt-dlp o el motor 
 
 3.0 is a big jump: **OCR was rebuilt from scratch** (PaddleOCR/RapidOCR instead of EasyOCR, engine running in a separate process, page-by-page decisions and reading at 200 DPI), the **metadata editor** went from "strip tags" to a full lab that reads, edits, cleans and **verifies** images, audio, video, PDF and Office documents without recompressing anything, and the **video converter** now really probes what your card can do (NVENC H.264/H.265/AV1, 10-bit, NVDEC, full-GPU pipeline) instead of assuming it.
 
-The app also **no longer loads PyTorch** (it only uses NVIDIA's DLLs): it starts faster and the executable is far smaller. You can now **use several modules at once** — convert a video while compressing images and downloading from YouTube — and anything that loads AI models takes turns so memory never saturates. Add **Spotify downloads**, a **3-download queue**, **undo last rename**, **language and multilingual mode** in transcription, and one rule that now applies everywhere: **nothing overwrites your files** (if the name exists, it is saved as `file (1)`).
+The app also **no longer loads PyTorch** (it only uses NVIDIA's DLLs): it starts faster and the executable is far smaller. You can now **use several modules at once** — convert a video while compressing images and downloading from YouTube — and anything that loads AI models takes turns so memory never saturates. Add **Spotify downloads**, a **3-download queue**, **subtitles and song lyrics**, **undo last rename**, **language and multilingual mode** in transcription, and one rule that now applies everywhere: **nothing overwrites your files** (if the name exists, it is saved as `file (1)`).
 
 On top of that, **the program becomes free software under the AGPL-3.0 license**: its source code is published at https://github.com/DoMiNaTh0R/DEUS-MACHINA-TOOLS.
 
@@ -257,13 +297,19 @@ The module went from "strip tags" to a full lab:
 - **Real capability detection:** the app actually tests what your FFmpeg and your card accept — **NVENC H.264 / H.265 / AV1**, **10-bit**, **NVDEC** (GPU decoding) and the **full-GPU** path (decode, scale and encode without touching RAM) — and picks the best options your machine supports instead of assuming they exist.
 - **Calibrated quality levels** per codec (5 levels in "Reduce size") and a "visually identical" mode in "Convert format", each with its CRF/CQ tuned per encoder (including **SVT-AV1** on CPU).
 - **Resolution selector** (Original, 1440p, 1080p, 720p, 480p) with GPU scaling when possible.
+- **Audio tracks and subtitles:** **Convert** and **Reduce size** ask which audio tracks and which subtitles to keep whenever there is something to choose (several tracks, or subtitles that fit the output format). Convert ticks everything by default (only one track used to survive and subtitles were lost except the first one in MKV); Reduce size ticks only the main audio track and no subtitles, so the file stays small, but always lets you tick more, with **All / Main** and **All / None** buttons. In MP4 and MOV text subtitles become tracks you switch on in the player, with their name (image-based PGS/DVD ones only fit in MKV); in MKV they are kept as-is, along with the fonts used by ASS subtitles. **Extract audio** lets you pick one or several tracks (one file per track, with the language in the name). With "Use the same choice for the other files" it does not ask again for that list.
 - **Smart audio per container:** if the track is already compatible it is copied as-is instead of re-encoding.
 - **Readable errors:** if FFmpeg fails, the summary shows the useful error line, not the whole dump.
 
-### 5.- Downloads: Spotify, 3-Download Queue and Verified Updater
+### 5.- Downloads: Spotify, 3-Download Queue, Settings and Verified Updater
 
-- **Spotify:** paste a track, album, playlist or artist link and the audio is downloaded via **spotDL**, with the same flow as YouTube (list warning, subfolder, per-song progress and a prompt every 50).
-- **3-download queue:** three download at a time and the rest wait showing **"⏳ Queued (#2)"**, in arrival order. As soon as one finishes downloading and moves on to converting or packaging, **the next one starts**.
+- **Spotify:** paste a track, album, playlist or artist link and the audio is downloaded via **spotDL**, with the same flow as YouTube (list warning, subfolder, per-song progress and a prompt every 50). It runs **outside the queue** (it neither waits for nor holds back YouTube downloads), downloads **up to 3 songs at once** and the "Analyzing" step is much faster. In Video mode it saves the audio as the **original M4A** (best quality, no re-encoding) instead of MP3; in Audio mode it uses the chosen format.
+- **3-download queue:** three download at a time and the rest wait showing **"⏳ Queued (#2)"**, in arrival order. As soon as one finishes downloading and moves on to converting or packaging, **the next one starts**. Cancelling or pausing **frees its slot instantly**, even while "Analyzing…".
+- **⚙️ Downloader settings** (saved automatically): **preferred codec** H.264 (default) or H.265 — VP9.2, AV1 and VP9 still come first when the video has them; the option only sets the order between H.264 and H.265, without slowing the download or ever lowering the resolution —; **audio track** for dubbed videos: original (default), English, Spanish, both or **Ask me** (a window lists the video's languages at download time —many videos carry dozens of dubs—, with **All / Original** buttons; if the chosen one is missing, the original is kept; each track carries its language and name so it can be picked in the player; in Audio mode a single track is saved); **subtitles inside the video**: no (default), Spanish, English, both or **Ask me** (a window lists every language uploaded by the author at download time so you can tick the ones you want, with **All / None**; never automatic ones; added as a selectable track, not burned into the picture; in a playlist it asks only once), **song lyrics** (YouTube Music links only, never Spotify, and only in Video mode; off by default: lyrics are searched on LRCLIB, YouTube Music and other providers and embedded as a "Letra" subtitle track when timed and in the video's lyrics tag; if none is found the download goes ahead without lyrics) and the Spotify warning. **Cover art** is now embedded in **MKV** too (as a `cover.jpg` attachment) and MP4 subtitle tracks show their name (Español, Letra…) in the player; if it ever cannot be embedded, the final status says so ("sin carátula") and the console shows why. A summary of the choices is shown at the bottom of that window, and **"Include Metadata"** is remembered too.
+- **TikTok:** the video is always downloaded **with its real audio**, in Audio mode too (the video's music track could be picked instead of what you actually hear).
+- **Faster YouTube:** each video is analyzed **only once** (it used to be twice, or three times with subtitles): the download reuses that analysis and saves 1–2 s per video.
+- **Videos with two editions:** some videos edited after upload have two versions (for example 964 s and 947 s) and, depending on the session, YouTube serves the older one entirely (video, audio and dubs) or partly (only the DASH formats, or only the HLS ones with their dubs), even though the page and the subtitles belong to the current one. The app spots it from the duration each format states (the HLS audio one is unreliable: the duration of the videos in the same playlist is used instead) and requests the video again with a fresh session (~1 s each, up to 8 times) until the current edition —the one YouTube plays— arrives complete. If it never does, a single edition is downloaded —never the video of one with the audio or dubs of the other— and the download says so ("⚠️ dura 947 s (YouTube dice 964 s)"). Also, if YouTube cuts a download halfway (403 error), it starts from scratch instead of resuming the half-downloaded data with new links. With a YouTube link, timed lyrics come from YouTube Music first, which is synced to that same video (LRCLIB's is the album version and could drift).
+- **"🧹 Clear finished":** removes finished, failed or cancelled downloads from the queue. Cancelled ones are now really deleted (they used to be only hidden and kept using memory).
 - **Automatic Deno:** the app downloads the JavaScript runtime yt-dlp needs to solve YouTube's challenges (once, from the official release), which prevents many download failures.
 - **Verified yt-dlp updater:** it checks the **SHA-256 signature** published by PyPI before installing; if it does not match, nothing is installed and the working version is kept. The updated version is also loaded without reinstalling the app.
 
@@ -274,6 +320,10 @@ The module went from "strip tags" to a full lab:
 - **Translate to English** with a checkbox, in Files and YouTube → Text.
 - **Live:** audio is no longer lost while the model transcribes (recording runs in parallel), the language is locked after the first reliable detection and, when you stop, the model **stays in memory** so you can record again instantly.
 - **No intermediate WAV files:** audio is decoded straight to memory at 16 kHz, so transcribing is faster and leaves no leftover files.
+- **YouTube → Text accepts Spotify links** (spotDL finds the song on YouTube) and downloads Deno when needed. On TikTok it transcribes the video's real audio.
+- **"⚡ Fast mode"** (Files and YouTube → Text, remembered): transcribes several speech chunks at once. With a GPU, 6 minutes of speech went from 21 s to ~4 s with the same text; on CPU, almost twice as fast. Subtitles still come out in normal-length lines. In YouTube → Text the log says whether it is on.
+- **New "Subtitles & Lyrics" tab:** downloads a video's **subtitles** (YouTube and other sites) without downloading the audio or using AI, as **.srt, .vtt or .txt**, and a **song's lyrics** (YouTube, YouTube Music or Spotify, even albums and playlists) **plain (.txt) or timed (.lrc)**, searching **LRCLIB**, **YouTube Music** and other providers. A single **🔍 Search and download** button: in Subtitles it opens a window to tick one or several languages (one file per language; YouTube's automatic captions come out clean, without repeated lines) and in Lyrics it downloads right away. Subtitles that paint each person in a different color can be saved as **plain text** (default), with **"Persona 1:", "Persona 2:"…** labels or **as they are** (always with their timings; the choice is remembered). Plain .txt lyrics come out **with the stanzas separated** (if a source gives them all run together, another source is tried). **Lists are accepted**: YouTube and YouTube Music playlists and albums (and other sites' lists), as well as Spotify ones. As in YouTube Downloader, it asks whether to download the list (if the link is a video inside a list, just that video can be downloaded); lists over 25 go **25 at a time** and it asks whether to continue after each batch; and there is a **pause** between items (2–5 s between videos, 1–2.5 s between lyrics) so the site is not flooded. For subtitles, languages are picked on the first video and used for all of them (each list gets its own folder). When it starts, the link is cleared from the field. The log is color-coded and ends with a summary such as **"Terminado: 10/10 letras guardadas con éxito"** (finished, 10/10 saved). If something fails, it says so on screen and in the log, without crashing.
+- **Files with several audio tracks** (movies, dubbed videos): if a file has more than one, transcription asks which one to transcribe; with a single track it does not ask at all.
 
 ### 7.- Renamer: Undo the Last Rename
 
@@ -293,6 +343,10 @@ With **"Force A4"** you choose **150 or 300 DPI**. That value is a **ceiling, no
 
 If you close the app while something is running, the running jobs are listed and confirmation is requested. On accept, external processes (FFmpeg, Ghostscript, yt-dlp, spotDL) and AI engines are actually terminated.
 
+### 11.- "🧹 Free AI model" Button
+
+In the main menu, Transcription, OCR and Background Removal: it unloads whichever AI model is in memory (Whisper, OCR or the background-removal one). If something is using it (or waiting for its turn), it is freed as soon as the last job finishes.
+
 ---
 
 ## 🛠️ Improvements
@@ -301,7 +355,9 @@ If you close the app while something is running, the running jobs are listed and
 
 - **No PyTorch:** the app no longer imports PyTorch to detect the GPU or for CUDA; it only uses NVIDIA's DLLs (CUDA 12.9 / cuDNN 9.10) plus lightweight queries to the card (NVML). **The executable is far smaller and starts faster.**
 - **NVENC/GPU detection no longer repeats on every startup:** it is measured the first time you open the video module and stored on disk, signed with FFmpeg + GPU + driver. If any of the three changes it is measured again automatically, and there is a **"↻ Re-detect"** button to force it by hand.
-- **Background removal preloads its libraries** when you open its tab, so pressing the button no longer means waiting.
+- **Background removal preloads its libraries** when you open its tab, so pressing the button no longer means waiting. If the model (176 MB) is missing, it starts downloading **in parallel** and shows real progress.
+- **Smoother startup:** heavy libraries start loading while the window is being built, and background screen preparation **pauses while you use the app** (it could freeze it for half a second at a time). The microphone list and the window icon are no longer computed on the UI thread, and secondary windows (About, Licenses, ⚙️ Settings…) are prepared —and drawn, invisibly— only while the app is idle, so they open instantly and complete, the first time too.
+- **Images and PDF in parallel:** converting or compressing images handles 2 or 3 at a time depending on the CPU (12 photos: from 11.8 s to 4.5 s) and PDF compression runs 3 Ghostscript processes at once (about as fast as a single one). The summary keeps the list order and two files with the same output name never overwrite each other.
 - **Tidy temporary files:** everything temporary (app, FFmpeg, yt-dlp, OCR engine) goes to a per-session folder inside `%TEMP%\DeusMachinaTools` that is cleaned on exit, including leftovers from sessions that closed badly.
 - **Only one AI model in memory:** a manager releases the model that is not in use (when another loads, or after 20 idle minutes).
 
@@ -319,6 +375,10 @@ If you close the app while something is running, the running jobs are listed and
 - **Reusable secondary windows:** summary, licenses, help and warning windows are created hidden and fully drawn, so they appear at once and centered (no flicker), with a dark title bar on Windows.
 - **Correct wording:** proper plurals (`1 page` / `70 pages`, `1 file` / `5 files`).
 - **Control order** in YouTube → Text matching the Files tab: AI Model · Translate to English · Format · Language.
+- **Even Transcription blocks:** Files, YouTube → Text and Subtitles & Lyrics now have all their blocks at the same width. YouTube → Text gets the Files **timer** (gold while working, green with the total), a color-coded, **read-only**, taller log with a scrollbar (if you scroll up to read, new lines no longer jump you to the bottom), and **Copy / Clear above** the console (the bottom buttons used to be cut off).
+- **YouTube Downloader:** the grey summary ("H.264 · sin subtítulos") moved to the bottom of ⚙️ Settings (and no longer glitches for a moment when an option changes), the subtitles card no longer looks stuck (languages only appear once subtitles are enabled) and **"🧹 Clear finished"** no longer cuts off its last letter.
+- **Lighter track and subtitle windows:** the ones in YouTube, Transcription, Subtitles & Lyrics and the Video converter draw the whole list at once: they open fully built and scroll without the text jumping around (with many options they used to build up piece by piece and the text looked broken while scrolling). All of them have one-click buttons: **All / None**, or **All / Original** (**Main** for your own files) where at least one must stay.
+- **Tabs without grey edges:** with Windows scaling (125 %, 150 %) tabs and segmented buttons (PDF, Video, Images, ⚙️ Settings…) showed a small grey line and notches at their edges; they are now drawn at their exact size.
 - **OCR card status centered** (detected GPU / "In memory ✓").
 
 ---
@@ -370,6 +430,26 @@ On displays with Windows scaling at 125 %, card texts were cut off ("Maximum acc
 ### 11.- Closing the App Left Processes Alive
 
 Closing with a conversion or download in progress left FFmpeg, yt-dlp or the OCR engine working in the background. They are all terminated now.
+
+### 12.- TikTok: Videos That Would Not Download
+
+Some TikToks failed in the downloader: an H.265 "video only" format that sometimes does not even download was picked and the video's music track was attached to it. The video is now downloaded with its own audio, at the best resolution.
+
+### 13.- Cancelled Downloads Blocking the Queue
+
+Cancelling while "Analyzing…" stopped nothing: the download kept its slot (even though it was no longer shown) and the next ones kept waiting. The slot is now freed instantly and child processes (spotDL's FFmpeg) are closed too.
+
+### 14.- Black Windows That Flashed and Closed
+
+In the compiled app, every console program that was launched flashed a black window: FFmpeg when converting from Spotify, the Deno runtime yt-dlp uses to solve YouTube's challenges (downloads and Subtitles & Lyrics) and the `where ccache` PaddlePaddle runs every time the OCR engine loads. They all run without a window now, in the app and in its separate processes (OCR engine, spotDL).
+
+### 15.- Background Removal Always Said "Downloading"
+
+It looked for the model in another folder and reported a download even when the model was already there.
+
+### 16.- Images to PDF: Very Long Final Message
+
+The DPI summary now goes on a short second line (for example `2 reduced to 300 DPI · 3 already below 300 DPI (min. 72)`).
 
 ---
 

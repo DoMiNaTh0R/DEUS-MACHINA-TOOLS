@@ -1,6 +1,6 @@
-============================================================
-                LICENSE INFORMATION DOCUMENT                
-============================================================
+================================================================================
+                          LICENSE INFORMATION DOCUMENT                          
+================================================================================
 
 This document contains the full, unmodified license texts for all external
 libraries and components used by the software DEUS MACHINA | TOOLS.
@@ -60,9 +60,9 @@ https://docs.nvidia.com/cuda/eula/index.html
 https://docs.nvidia.com/deeplearning/cudnn/sla/index.html
 
 
-============================================================
-                SUMMARY OF INCLUDED PACKAGES                
-============================================================
+================================================================================
+                          SUMMARY OF INCLUDED PACKAGES                          
+================================================================================
 
 aiohappyeyeballs==2.7.1
 aiohttp==3.14.3
@@ -228,9 +228,9 @@ yt-dlp-ejs==0.8.0
 ytmusicapi==1.12.3
 
 
-============================================================
-                   DETAILED LICENSE TEXTS                   
-============================================================
+================================================================================
+                             DETAILED LICENSE TEXTS                             
+================================================================================
 
 --- aiohappyeyeballs (2.7.1) ---
 License Type: Python Software Foundation License
@@ -515,7 +515,7 @@ LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
 OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
 PERFORMANCE OF THIS SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- aiohttp (3.14.3) ---
 License Type: Apache-2.0 AND MIT
@@ -746,7 +746,7 @@ DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
 OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
 USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- aiosignal (1.4.0) ---
 License Type: Apache Software License
@@ -953,7 +953,7 @@ Apache License
    See the License for the specific language governing permissions and
    limitations under the License.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- aistudio_sdk (0.3.9) ---
 License Type: Apache Software License
@@ -1160,7 +1160,7 @@ Apache License
    See the License for the specific language governing permissions and
    limitations under the License.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- annotated-types (0.8.0) ---
 License Type: MIT
@@ -1187,7 +1187,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- antlr4-python3-runtime (4.9.3) ---
 License Type: BSD 3-Clause License
@@ -1196,7 +1196,7 @@ El runtime de ANTLR 4 para Python se publica bajo licencia BSD de 3 cláusulas
 (Copyright (c) 2012-2017 The ANTLR Project). Texto completo en:
 https://github.com/antlr/antlr4/blob/master/LICENSE.txt
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- anyio (3.7.1) ---
 License Type: MIT License
@@ -1222,7 +1222,7 @@ COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- attrs (26.1.0) ---
 License Type: MIT
@@ -1249,7 +1249,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- av (18.1.0) ---
 License Type: BSD-3-Clause
@@ -1409,7 +1409,7 @@ OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
 NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- bce-python-sdk (0.9.79) ---
 License Type: Apache License 2.0
@@ -1419,7 +1419,7 @@ El SDK de Baidu Cloud (bce-python-sdk) se publica bajo la Apache License 2.0
 este mismo documento junto a otros paquetes, y en:
 https://github.com/baidubce/bce-sdk-python/blob/master/LICENSE
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- beautifulsoup4 (4.15.0) ---
 License Type: MIT License
@@ -1507,7 +1507,7 @@ Beautiful Soup has an optional dependency on the soupsieve library,
 which is also made available under the MIT license. Copyright (c)
 Isaac Muse
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- brotli (1.2.0) ---
 License Type: MIT
@@ -1532,7 +1532,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- certifi (2026.7.22) ---
 License Type: Mozilla Public License 2.0 (MPL 2.0)
@@ -1558,7 +1558,7 @@ one at http://mozilla.org/MPL/2.0/.
 ***** END LICENSE BLOCK *****
 @(#) $RCSfile: certdata.txt,v $ $Revision: 1.80 $ $Date: 2011/11/03 15:11:58 $
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- cffi (2.1.1) ---
 License Type: MIT-0
@@ -1585,7 +1585,7 @@ documentation is licensed as follows:
     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER 
     DEALINGS IN THE SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- chardet (7.6.0) ---
 License Type: 0BSD
@@ -1603,7 +1603,7 @@ OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
 TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF
 THIS SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- charset-normalizer (3.5.1) ---
 License Type: MIT
@@ -1630,7 +1630,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- click (8.5.0) ---
 License Type: BSD-3-Clause
@@ -1664,7 +1664,7 @@ LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
 NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- colorama (0.4.6) ---
 License Type: BSD License
@@ -1697,7 +1697,7 @@ CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- colorlog (6.12.0) ---
 License Type: MIT License
@@ -1723,7 +1723,7 @@ COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- crc32c (2.9.post0) ---
 License Type: GNU Lesser General Public License v2 or later (LGPLv2+)
@@ -2231,7 +2231,7 @@ necessary.  Here is a sample; alter the names:
 
 That's all there is to it!
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- cryptography (50.0.1) ---
 License Type: Apache-2.0 OR BSD-3-Clause
@@ -2472,7 +2472,7 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- ctranslate2 (4.8.2) ---
 License Type: MIT License
@@ -2484,7 +2484,7 @@ https://github.com/OpenNMT/CTranslate2/blob/master/LICENSE
 El texto íntegro de la licencia MIT aparece en este mismo documento junto a
 otros paquetes (por ejemplo faster-whisper).
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- curl_cffi (0.15.0) ---
 License Type: MIT
@@ -2513,7 +2513,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- customtkinter (6.0.0) ---
 License Type: MIT License
@@ -2540,7 +2540,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- dacite (1.9.2) ---
 License Type: MIT License
@@ -2567,7 +2567,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- darkdetect (0.8.0) ---
 License Type: BSD License
@@ -2597,7 +2597,7 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- datastar-py (1.0.2) ---
 License Type: MIT
@@ -2610,7 +2610,7 @@ The above copyright notice and this permission notice shall be included in all c
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- Deno (descargado bajo demanda (release oficial)) ---
 License Type: MIT License
@@ -2640,7 +2640,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- Deprecated (1.3.1) ---
 License Type: MIT License
@@ -2667,7 +2667,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- dnspython (2.8.0) ---
 License Type: ISC License (ISCL)
@@ -2708,7 +2708,7 @@ WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
 ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
 OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- et_xmlfile (2.0.0) ---
 License Type: MIT License
@@ -2744,7 +2744,7 @@ CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- fastapi (0.103.2) ---
 License Type: MIT
@@ -2771,7 +2771,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- faster-whisper (1.2.1) ---
 License Type: MIT License
@@ -2798,7 +2798,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- FFmpeg (9.0.1 (gyan.dev full build)) ---
 License Type: GNU General Public License v3
@@ -3481,7 +3481,7 @@ the library.  If this is what you want to do, use the GNU Lesser General
 Public License instead of this License.  But first, please read
 <http://www.gnu.org/philosophy/why-not-lgpl.html>.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- filelock (3.32.3) ---
 License Type: MIT
@@ -3508,7 +3508,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- flatbuffers (25.12.19) ---
 License Type: Apache License 2.0
@@ -3518,7 +3518,7 @@ El texto completo de la Apache License 2.0 aparece en este mismo documento
 junto a otros paquetes, y en:
 https://github.com/google/flatbuffers/blob/master/LICENSE
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- frozenlist (1.8.0) ---
 License Type: Apache-2.0
@@ -3725,7 +3725,7 @@ Apache License
    See the License for the specific language governing permissions and
    limitations under the License.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- fsspec (2026.7.0) ---
 License Type: BSD-3-Clause
@@ -3760,7 +3760,7 @@ CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- future (1.0.0) ---
 License Type: MIT License
@@ -3785,7 +3785,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- Ghostscript (10.06.0) ---
 License Type: GNU Affero General Public License v3
@@ -4455,7 +4455,7 @@ if any, to sign a "copyright disclaimer" for the program, if necessary.
 For more information on this, and how to apply and follow the GNU AGPL, see
 <http://www.gnu.org/licenses/>.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- h11 (0.16.0) ---
 License Type: MIT License
@@ -4483,7 +4483,7 @@ LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- hf-xet (1.6.0) ---
 License Type: Apache-2.0
@@ -4690,7 +4690,7 @@ Apache License
    See the License for the specific language governing permissions and
    limitations under the License.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- httpcore (1.0.9) ---
 License Type: BSD-3-Clause
@@ -4723,7 +4723,7 @@ CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- httpx (0.28.1) ---
 License Type: BSD License
@@ -4741,7 +4741,7 @@ Redistribution and use in source and binary forms, with or without modification,
 
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- huggingface_hub (1.32.0) ---
 License Type: Apache Software License
@@ -4948,7 +4948,7 @@ Apache License
    See the License for the specific language governing permissions and
    limitations under the License.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- idna (3.20) ---
 License Type: BSD-3-Clause
@@ -4985,7 +4985,7 @@ LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
 NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- ImageIO (2.37.4) ---
 License Type: BSD-2-Clause
@@ -5014,7 +5014,7 @@ CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- imagesize (2.0.1) ---
 License Type: MIT
@@ -5039,7 +5039,7 @@ IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMA
 WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH
 THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- jaconv (0.5.0) ---
 License Type: MIT License
@@ -5066,7 +5066,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- JetBrains Mono (tipografía) (2.304) ---
 License Type: SIL Open Font License 1.1
@@ -5116,7 +5116,7 @@ OR CONSEQUENTIAL DAMAGES, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 ARISING FROM, OUT OF THE USE OR INABILITY TO USE THE FONT SOFTWARE OR FROM OTHER
 DEALINGS IN THE FONT SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- Jinja2 (3.1.6) ---
 License Type: BSD License
@@ -5150,7 +5150,7 @@ LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
 NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- jsonschema (4.26.0) ---
 License Type: MIT
@@ -5175,7 +5175,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- jsonschema-specifications (2025.9.1) ---
 License Type: MIT
@@ -5200,7 +5200,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- lazy-loader (0.5) ---
 License Type: BSD-3-Clause
@@ -5235,7 +5235,7 @@ CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- llvmlite (0.49.0) ---
 License Type: BSD-2-Clause AND Apache-2.0 WITH LLVM-exception
@@ -5265,7 +5265,7 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- lxml (6.1.3) ---
 License Type: BSD-3-Clause
@@ -5431,7 +5431,7 @@ Except as contained in this notice, the name of the authors shall not
 be used in advertising or otherwise to promote the sale, use or other deal-
 ings in this Software without prior written authorization from him.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- markdown-it-py (4.2.0) ---
 License Type: MIT License
@@ -5458,7 +5458,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- MarkupSafe (3.0.3) ---
 License Type: BSD-3-Clause
@@ -5492,7 +5492,7 @@ LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
 NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- mdurl (0.1.2) ---
 License Type: MIT License
@@ -5544,7 +5544,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 IN THE SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- Modelo u2net (rembg) (u2net.onnx) ---
 License Type: MIT License (U-2-Net)
@@ -5556,7 +5556,7 @@ U-2-Net se distribuye bajo licencia MIT (Copyright (c) 2020 Xuebin Qin).
 rembg, la librería que lo ejecuta, también es MIT; su texto completo aparece
 en este documento junto al paquete rembg.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- Modelos PP-OCRv6 (PaddleOCR) (PP-OCRv6_medium det + rec) ---
 License Type: Apache License 2.0
@@ -5568,7 +5568,7 @@ Los modelos PP-OCR se publican bajo la Apache License 2.0, la misma licencia
 que PaddleOCR y PaddlePaddle. El texto completo de la Apache License 2.0
 aparece en este documento junto a los paquetes paddleocr / paddlepaddle-gpu.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- modelscope (1.40.1) ---
 License Type: Apache-2.0
@@ -5775,7 +5775,7 @@ Apache License
    See the License for the specific language governing permissions and
    limitations under the License.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- modelscope-hub (0.4.3) ---
 License Type: Apache Software License
@@ -5982,7 +5982,7 @@ Apache License
    See the License for the specific language governing permissions and
    limitations under the License.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- mpmath (1.3.0) ---
 License Type: BSD License
@@ -6015,7 +6015,7 @@ LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
 DAMAGE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- multidict (6.9.0) ---
 License Type: Apache License 2.0
@@ -6222,7 +6222,7 @@ Apache License
    See the License for the specific language governing permissions and
    limitations under the License.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- mutagen (1.48.1) ---
 License Type: GPL-2.0-or-later
@@ -6567,7 +6567,7 @@ consider it more useful to permit linking proprietary applications with the
 library.  If this is what you want to do, use the GNU Lesser General
 Public License instead of this License.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- networkx (3.6.1) ---
 License Type: BSD-3-Clause
@@ -6610,7 +6610,7 @@ NetworkX is distributed with the 3-clause BSD license.
    (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
    OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- numba (0.67.0) ---
 License Type: BSD License
@@ -6640,7 +6640,7 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- numpy (2.3.5) ---
 License Type: BSD License
@@ -7595,7 +7595,7 @@ the library.  If this is what you want to do, use the GNU Lesser General
 Public License instead of this License.  But first, please read
 <https://www.gnu.org/licenses/why-not-lgpl.html>.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- NVIDIA CUDA Runtime y cuDNN (CUDA 12.9 · cuDNN 9.10) ---
 License Type: NVIDIA CUDA Toolkit EULA / NVIDIA cuDNN SLA
@@ -7618,7 +7618,7 @@ authoritative texts are published by NVIDIA at:
 NVIDIA, CUDA and cuDNN are trademarks and/or registered trademarks of NVIDIA
 Corporation in the U.S. and other countries.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- omegaconf (2.3.1) ---
 License Type: BSD License
@@ -7653,7 +7653,7 @@ CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- onnxruntime (1.30.0) ---
 License Type: MIT License
@@ -7662,7 +7662,7 @@ ONNX Runtime se publica bajo licencia MIT (Copyright (c) Microsoft Corporation).
 El wheel no incluye el archivo de licencia; el texto completo está en:
 https://github.com/microsoft/onnxruntime/blob/main/LICENSE
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- opencv-contrib-python (4.10.0.84) ---
 License Type: Apache Software License
@@ -10781,7 +10781,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- opencv-python (4.10.0.84) ---
 License Type: Apache Software License
@@ -13900,7 +13900,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- openpyxl (3.1.5) ---
 License Type: MIT License
@@ -13929,7 +13929,7 @@ CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- opt-einsum (3.3.0) ---
 License Type: MIT
@@ -13956,7 +13956,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- packaging (26.3) ---
 License Type: Apache-2.0 OR BSD-2-Clause
@@ -14168,7 +14168,7 @@ CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- paddleocr (3.7.0) ---
 License Type: Apache License 2.0
@@ -14375,7 +14375,7 @@ Apache License
    See the License for the specific language governing permissions and
    limitations under the License.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- paddlepaddle-gpu (3.3.1) ---
 License Type: Apache Software License
@@ -14584,7 +14584,7 @@ Copyright (c) 2016 PaddlePaddle Authors. All Rights Reserved
    See the License for the specific language governing permissions and
    limitations under the License.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- paddlex (3.7.2) ---
 License Type: Apache-2.0
@@ -14759,7 +14759,7 @@ Apache License
    See the License for the specific language governing permissions and
    limitations under the License.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- pandas (3.0.6) ---
 License Type: BSD License
@@ -14796,7 +14796,7 @@ CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- piexif (1.1.3) ---
 License Type: MIT License
@@ -14823,7 +14823,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- pillow (12.3.0) ---
 License Type: MIT-CMU
@@ -16446,7 +16446,7 @@ freely, subject to the following restrictions:
 
 3. This notice may not be removed or altered from any source distribution.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- pip (26.2.1) ---
 License Type: MIT
@@ -17635,7 +17635,7 @@ CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- platformdirs (4.11.11) ---
 License Type: MIT
@@ -17662,7 +17662,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- pooch (1.9.0) ---
 License Type: BSD-3-Clause
@@ -17720,7 +17720,7 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- prettytable (3.18.0) ---
 License Type: BSD-3-Clause
@@ -17756,7 +17756,7 @@ License Type: BSD-3-Clause
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- propcache (0.5.4) ---
 License Type: Apache-2.0
@@ -17978,7 +17978,7 @@ Copyright 2016-2021, Andrew Svetlov and aio-libs team
    See the License for the specific language governing permissions and
    limitations under the License.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- protobuf (7.36.2) ---
 License Type: 3-Clause BSD License
@@ -18016,7 +18016,7 @@ of the input file used when generating it.  This code is not
 standalone and requires a support library to be linked with it.  This
 support library is itself covered by the above license.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- psutil (7.2.2) ---
 License Type: BSD-3-Clause
@@ -18051,7 +18051,7 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- py-cpuinfo (9.0.0) ---
 License Type: MIT License
@@ -18077,7 +18077,7 @@ COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- PyAudio (0.2.14) ---
 License Type: MIT License
@@ -18103,7 +18103,7 @@ LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- pyclipper (1.4.0) ---
 License Type: MIT License
@@ -18130,7 +18130,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- pycparser (3.0) ---
 License Type: BSD-3-Clause
@@ -18163,7 +18163,7 @@ HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
 LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT 
 OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- pycryptodome (3.23.0) ---
 License Type: BSD License
@@ -18283,7 +18283,7 @@ CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- pycryptodomex (3.23.0) ---
 License Type: BSD License
@@ -18403,7 +18403,7 @@ CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- pydantic (2.13.5) ---
 License Type: MIT
@@ -18430,7 +18430,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- pydantic_core (2.46.5) ---
 License Type: MIT
@@ -18457,7 +18457,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- Pygments (2.21.0) ---
 License Type: BSD-2-Clause
@@ -18786,7 +18786,7 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- pykakasi (2.3.0) ---
 License Type: GNU General Public License v3 or later (GPLv3+)
@@ -19498,7 +19498,7 @@ the library.  If this is what you want to do, use the GNU Lesser General
 Public License instead of this License.  But first, please read
 <http://www.gnu.org/philosophy/why-not-lgpl.html>.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- PyMatting (1.1.16) ---
 License Type: MIT License
@@ -19525,7 +19525,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- pymongo (4.18.1) ---
 License Type: Apache-2.0
@@ -19732,14 +19732,14 @@ Apache License
    See the License for the specific language governing permissions and
    limitations under the License.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- pymupdf (1.28.2) ---
 License Type: Dual Licensed - GNU AFFERO GPL 3.0 or Artifex Commercial License
 
 Dual Licensed - GNU AFFERO GPL 3.0 or Artifex Commercial License
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- PyOTP (2.10.0) ---
 License Type: MIT
@@ -19766,7 +19766,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- PyPDF2 (3.0.1) ---
 License Type: BSD License
@@ -19801,7 +19801,7 @@ CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
 ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 POSSIBILITY OF SUCH DAMAGE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- pypdfium2 (5.13.0) ---
 License Type: BSD-3-Clause, Apache-2.0, dependency licenses
@@ -19809,7 +19809,7 @@ License Type: BSD-3-Clause, Apache-2.0, dependency licenses
 Licencia declarada: BSD-3-Clause, Apache-2.0, dependency licenses
 El paquete no incluye el texto completo en su distribución.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- python-bidi (0.6.11) ---
 License Type: GNU Library or Lesser General Public License (LGPL)
@@ -20514,7 +20514,7 @@ the library.  If this is what you want to do, use the GNU Lesser General
 Public License instead of this License.  But first, please read
 <http://www.gnu.org/philosophy/why-not-lgpl.html>.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- python-dateutil (2.9.0.post0) ---
 License Type: BSD License
@@ -20574,7 +20574,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 The above BSD License Applies to all code, even that also covered by Apache 2.0.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- python-docx (1.2.0) ---
 License Type: MIT License
@@ -20600,7 +20600,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- python-multipart (0.0.32) ---
 License Type: Apache-2.0
@@ -20807,7 +20807,7 @@ Apache License
    See the License for the specific language governing permissions and
    limitations under the License.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- python-pptx (1.0.2) ---
 License Type: MIT License
@@ -20833,7 +20833,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- python-slugify (8.0.4) ---
 License Type: MIT License
@@ -20860,7 +20860,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- PyYAML (6.0.2) ---
 License Type: MIT License
@@ -20886,7 +20886,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- RapidFuzz (3.14.6) ---
 License Type: MIT
@@ -20913,7 +20913,7 @@ LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- rapidocr (3.9.2) ---
 License Type: Apache License 2.0
@@ -20924,7 +20924,7 @@ completo de la Apache License 2.0 aparece en este mismo documento junto a
 otros paquetes (por ejemplo paddleocr) y en:
 https://github.com/RapidAI/RapidOCR/blob/main/LICENSE
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- readerwriterlock (1.0.9) ---
 License Type: MIT License
@@ -20965,7 +20965,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- redis (8.1.0) ---
 License Type: MIT
@@ -20992,7 +20992,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- referencing (0.37.0) ---
 License Type: MIT
@@ -21017,7 +21017,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- rembg (2.0.84) ---
 License Type: MIT License
@@ -21044,7 +21044,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- requests (2.34.2) ---
 License Type: Apache Software License
@@ -21228,7 +21228,7 @@ Apache License
 Requests
 Copyright 2019 Kenneth Reitz
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- rich (13.9.4) ---
 License Type: MIT License
@@ -21253,7 +21253,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- rpds-py (2026.6.3) ---
 License Type: MIT
@@ -21278,7 +21278,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- ruamel.yaml (0.19.1) ---
 License Type: MIT License
@@ -21305,7 +21305,7 @@ The MIT License (MIT)
  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- safetensors (0.8.0) ---
 License Type: Apache Software License
@@ -21512,7 +21512,7 @@ Apache License
    See the License for the specific language governing permissions and
    limitations under the License.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- scikit-image (0.26.0) ---
 License Type: BSD License
@@ -21670,7 +21670,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- scipy (1.18.1) ---
 License Type: BSD License
@@ -22591,7 +22591,7 @@ the library.  If this is what you want to do, use the GNU Lesser General
 Public License instead of this License.  But first, please read
 <http://www.gnu.org/philosophy/why-not-lgpl.html>.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- setuptools (84.0.0) ---
 License Type: MIT
@@ -22840,7 +22840,7 @@ OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- shapely (2.1.2) ---
 License Type: BSD License
@@ -23414,7 +23414,7 @@ License: MSVC
   VC\atlmfc\lib\mfcmifc80.dll
   VC\atlmfc\lib\amd64\mfcmifc80.dll
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- six (1.17.0) ---
 License Type: MIT License
@@ -23438,7 +23438,7 @@ COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- sniffio (1.3.1) ---
 License Type: MIT License
@@ -23469,7 +23469,7 @@ LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- soundcloud-v2 (1.7.0) ---
 License Type: MIT License
@@ -23496,7 +23496,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- soupsieve (2.9.2) ---
 License Type: MIT
@@ -23523,7 +23523,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- spotapi (1.2.8) ---
 License Type: Ver texto de la licencia
@@ -24203,7 +24203,7 @@ the library. If this is what you want to do, use the GNU Lesser General
 Public License instead of this License. But first, please read
 <https://www.gnu.org/licenses/why-not-lgpl.html>.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- spotdl (4.5.2) ---
 License Type: MIT
@@ -24230,7 +24230,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- spotipy (2.26.0) ---
 License Type: MIT
@@ -24257,7 +24257,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- spotipyFree (1.9.14) ---
 License Type: Ver texto de la licencia
@@ -24270,7 +24270,7 @@ The above copyright notice and this permission notice shall be included in all c
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- starlette (0.27.0) ---
 License Type: BSD-3-Clause
@@ -24303,7 +24303,7 @@ CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- sympy (1.14.0) ---
 License Type: BSD License
@@ -25843,7 +25843,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- syncedlyrics (1.0.1) ---
 License Type: MIT License
@@ -25870,7 +25870,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- text-unidecode (1.3) ---
 License Type: Artistic License
@@ -26010,7 +26010,7 @@ WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
 
                                 The End
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- tifffile (2026.9.15) ---
 License Type: BSD-3-Clause
@@ -26046,7 +26046,7 @@ CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
 ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 POSSIBILITY OF SUCH DAMAGE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- tkinterdnd2 (0.6.3) ---
 License Type: MIT License
@@ -26073,7 +26073,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- tokenizers (0.23.2) ---
 License Type: Apache License 2.0
@@ -26083,7 +26083,7 @@ El wheel no incluye el archivo de licencia; el texto completo de la Apache
 License 2.0 aparece en este mismo documento junto a otros paquetes y en:
 https://github.com/huggingface/tokenizers/blob/main/LICENSE
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- torch (2.8.0+cu129) ---
 License Type: BSD License
@@ -35479,7 +35479,7 @@ and reference the following license:
     OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
     PERFORMANCE OF THIS SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- tqdm (4.70.1) ---
 License Type: MPL-2.0 AND MIT
@@ -35534,7 +35534,7 @@ COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- typing-inspection (0.4.4) ---
 License Type: MIT
@@ -35561,7 +35561,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- typing_extensions (4.16.0) ---
 License Type: PSF-2.0
@@ -35846,7 +35846,7 @@ LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
 OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
 PERFORMANCE OF THIS SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- tzdata (2026.4) ---
 License Type: Apache-2.0
@@ -36071,7 +36071,7 @@ Apache License
    See the License for the specific language governing permissions and
    limitations under the License.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- ujson (6.0.0) ---
 License Type: BSD-3-Clause AND TCL
@@ -36191,7 +36191,7 @@ https://opensource.apple.com/source/tcl/tcl-14/tcl/license.terms
   permission to use and distribute the software in accordance with the
   terms specified in this license.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- Unidecode (1.4.0) ---
 License Type: GNU General Public License v2 or later (GPLv2+)
@@ -36536,7 +36536,7 @@ consider it more useful to permit linking proprietary applications with the
 library.  If this is what you want to do, use the GNU Lesser General
 Public License instead of this License.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- urllib3 (2.8.0) ---
 License Type: MIT
@@ -36563,7 +36563,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- uvicorn (0.23.2) ---
 License Type: BSD-3-Clause
@@ -36596,7 +36596,7 @@ CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- validators (0.35.0) ---
 License Type: MIT License
@@ -36622,7 +36622,7 @@ COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- wcwidth (0.8.4) ---
 License Type: MIT
@@ -36655,7 +36655,7 @@ Permission to use, copy, modify, and distribute this software
 for any purpose and without fee is hereby granted. The author
 disclaims all warranties with regard to this software.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- websockets (14.2) ---
 License Type: BSD License
@@ -36685,7 +36685,7 @@ CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- Whisper (modelos de faster-whisper) (tiny / base / small / medium / large) ---
 License Type: MIT License (OpenAI Whisper)
@@ -36697,7 +36697,7 @@ Whisper se publica bajo licencia MIT (Copyright (c) 2022 OpenAI). Los modelos
 convertidos para faster-whisper conservan esa licencia. El texto completo de la
 licencia MIT aparece en este documento junto al paquete faster-whisper.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- wrapt (2.4.1) ---
 License Type: BSD-2-Clause
@@ -36727,7 +36727,7 @@ CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
 ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 POSSIBILITY OF SUCH DAMAGE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- xlsxwriter (3.2.9) ---
 License Type: BSD License
@@ -36758,7 +36758,7 @@ CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- yarl (1.25.1) ---
 License Type: Apache-2.0
@@ -36980,7 +36980,7 @@ Copyright 2016-2021, Andrew Svetlov and aio-libs team
    See the License for the specific language governing permissions and
    limitations under the License.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- yt-dlp (2026.8.19) ---
 License Type: Unlicense
@@ -37010,7 +37010,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 For more information, please refer to <http://unlicense.org/>
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- yt-dlp-ejs (0.8.0) ---
 License Type: Unlicense AND MIT AND ISC
@@ -37040,7 +37040,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 For more information, please refer to <https://unlicense.org/>
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --- ytmusicapi (1.12.3) ---
 License Type: MIT
@@ -37067,4 +37067,4 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
