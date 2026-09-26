@@ -7,7 +7,7 @@ click==8.3.2
 colorama==0.4.6
 coloredlogs==15.0.1
 ctranslate2==4.6.0
-customtkinter==5.2.2
+customtkinter==6.0.0
 darkdetect==0.8.0
 easyocr==1.7.2
 et_xmlfile==2.0.0
