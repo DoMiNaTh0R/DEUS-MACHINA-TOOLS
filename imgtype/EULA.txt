@@ -1,7 +1,7 @@
 TÉRMINOS DE LICENCIA Y USO
 
 SOFTWARE: DEUS MACHINA | TOOLS (y todas sus versiones y actualizaciones futuras)
-VERSIÓN: 3.0
+VERSIÓN: 3.1
 AUTOR: Kevin González (DoMiNaTh0R)
 LICENCIA: GNU Affero General Public License, versión 3 (AGPL-3.0) o posterior
 CÓDIGO FUENTE: https://github.com/DoMiNaTh0R/DEUS-MACHINA-TOOLS
@@ -52,8 +52,7 @@ legal y por decisión del autor, todo el código original de DEUS MACHINA | TOOL
 se publica también bajo AGPL-3.0.
 
 1.6 El código fuente correspondiente a cada versión distribuida está disponible
-públicamente en https://github.com/DoMiNaTh0R/DEUS-MACHINA-TOOLS y también se
-envía por correo electrónico a quien lo solicite a DoMiNaTh0RRoyale@gmail.com.
+públicamente en https://github.com/DoMiNaTh0R/DEUS-MACHINA-TOOLS.
 
 
 2. PROPIEDAD INTELECTUAL, NOMBRE Y MARCAS
@@ -177,6 +176,12 @@ ni almacena datos personales ni de uso.
     instalarse.
 (b) Funciones de red explícitas: la descarga de contenido multimedia requiere
     conexión activa mientras se usa.
+(c) Actualizaciones: como máximo una vez al día, el software consulta la página
+    pública de releases de GitHub para saber si hay una versión nueva de sí
+    mismo o de Deno. Si aceptas instalar una versión nueva, el instalador se
+    descarga de GitHub y se comprueban su huella SHA-256 y su firma digital
+    antes de ejecutarlo; Deno se actualiza del mismo modo, con su huella SHA-256
+    verificada.
 
 4.3 En todos los casos la conexión es técnica y unidireccional (descarga de
 recursos) y no implica el envío de datos privados del Usuario al autor.
@@ -237,7 +242,7 @@ residencia.
 9. CONTACTO
 
 Autor: Kevin González (DoMiNaTh0R)
-Correo: DoMiNaTh0RRoyale@gmail.com
+Soporte y consultas: https://github.com/DoMiNaTh0R/DEUS-MACHINA-TOOLS/issues
 Código fuente: https://github.com/DoMiNaTh0R/DEUS-MACHINA-TOOLS
 
 
@@ -249,7 +254,7 @@ ENGLISH VERSION:
 LICENSE AND USAGE TERMS
 
 SOFTWARE: DEUS MACHINA | TOOLS (and all its future versions and updates)
-VERSION: 3.0
+VERSION: 3.1
 AUTHOR: Kevin González (DoMiNaTh0R)
 LICENSE: GNU Affero General Public License, version 3 (AGPL-3.0) or later
 SOURCE CODE: https://github.com/DoMiNaTh0R/DEUS-MACHINA-TOOLS
@@ -298,8 +303,7 @@ author's decision, all original DEUS MACHINA | TOOLS code is also published
 under AGPL-3.0.
 
 1.6 The corresponding source code for every distributed version is publicly
-available at https://github.com/DoMiNaTh0R/DEUS-MACHINA-TOOLS and is also sent
-by email to anyone who requests it at DoMiNaTh0RRoyale@gmail.com.
+available at https://github.com/DoMiNaTh0R/DEUS-MACHINA-TOOLS.
 
 
 2. INTELLECTUAL PROPERTY, NAME AND TRADEMARKS
@@ -419,6 +423,11 @@ store personal or usage data.
     PyPI and verified against their SHA-256 signature before installation.
 (b) Explicit network features: downloading media requires an active connection
     while in use.
+(c) Updates: at most once a day, the software reads GitHub's public releases
+    page to find out whether a new version of itself or of Deno exists. If you
+    accept installing a new version, the installer is downloaded from GitHub and
+    its SHA-256 hash and digital signature are checked before it runs; Deno is
+    updated the same way, with its SHA-256 hash verified.
 
 4.3 In every case the connection is technical and one-directional (resource
 download) and involves no transmission of the User's private data to the
@@ -477,5 +486,5 @@ any mandatory legal guarantees in the User's country of residence.
 9. CONTACT
 
 Author: Kevin González (DoMiNaTh0R)
-Email: DoMiNaTh0RRoyale@gmail.com
+Support and inquiries: https://github.com/DoMiNaTh0R/DEUS-MACHINA-TOOLS/issues
 Source code: https://github.com/DoMiNaTh0R/DEUS-MACHINA-TOOLS

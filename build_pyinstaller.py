@@ -11,11 +11,17 @@ Versión CON consola (para diagnosticar; muestra todo lo que imprime la app):
 
 Resultado:
     dist\\DEUS_MACHINA_TOOLS\\DEUS_MACHINA_TOOLS.exe
-Después copia la carpeta 'tools' (ffmpeg, ghostscript, modelos...) junto al .exe.
+Después copia la carpeta 'tools' (ffmpeg, ghostscript, modelos...) junto al .exe
+(compilar_dmt.bat hace todo eso y deja la carpeta lista para Inno Setup).
+
+Versión: se toma SOLA de la línea  version = "X.Y"  de Deus_machina_tools.py.
+Con ella se genera version_info.txt (metadatos del .exe, que luego lee Inno
+Setup) y se avisa si README/CHANGELOG no la mencionan.
+    python build_pyinstaller.py --version     -> solo imprime la versión
 
 Registros de la app compilada (sin consola):
-    %LOCALAPPDATA%\\DeusMachinaTools\\logs\\ultima_sesion.log   (app)
-    %LOCALAPPDATA%\\DeusMachinaTools\\logs\\motor_ocr.log       (motor OCR)
+    %LOCALAPPDATA%\\DEUS MACHINA\\DeusMachinaTools\\logs\\ultima_sesion.log   (app)
+    %LOCALAPPDATA%\\DEUS MACHINA\\DeusMachinaTools\\logs\\motor_ocr.log       (motor OCR)
 
 CUDA sin PyTorch:
   La app ya no importa PyTorch: solo necesita las DLL de NVIDIA (CUDA 12.9 /
@@ -37,7 +43,9 @@ Qué hace además de compilar:
      · CUDA/cuDNN duplicadas fuera de _internal\\cuda: se eliminan de la raíz
        de _internal (y los restos de torch) y se avisa de cualquier otra copia.
 """
+import ast
 import ctypes
+import datetime
 import importlib.metadata
 import importlib.util
 import os
@@ -48,6 +56,13 @@ import sys
 APP = "Deus_machina_tools.py"
 NOMBRE = "DEUS_MACHINA_TOOLS"
 CONSOLA = os.environ.get("DMT_CONSOLA", "").strip() == "1"
+
+# Documentos que deben mencionar la versión actual (solo se avisa si no)
+DOCS_CON_VERSION = [
+    os.path.join("imgtype", "README.md"),
+    os.path.join("imgtype", "README.txt"),
+    os.path.join("imgtype", "CHANGELOG.md"),
+]
 
 # Librerías que no usa la app (reducen tamaño y tiempo de análisis)
 EXCLUIR = [
@@ -95,9 +110,9 @@ METADATOS = [
 # Importaciones que la app hace con importlib (carga en segundo plano) y que
 # el análisis estático no ve; PIL._tkinter_finder lo necesita ImageTk.
 IMPORTS_OCULTOS = [
-    "numpy", "cv2", "pymupdf", "PyPDF2", "yt_dlp",
+    "numpy", "cv2", "pymupdf", "pypdf", "yt_dlp",
     "faster_whisper", "pyaudio", "piexif", "mutagen", "docx", "openpyxl", "pptx",
-    "PIL._tkinter_finder",
+    "PIL._tkinter_finder", "truststore",
 ]
 
 # DLLs del runtime de Visual C++
@@ -175,6 +190,80 @@ def _version_dll(ruta):
 
 def _txt_version(v):
     return ".".join(str(x) for x in v) if v else "?"
+
+
+def leer_version(base):
+    """La versión de la app: la línea  version = "X.Y"  de Deus_machina_tools.py."""
+    with open(os.path.join(base, APP), encoding="utf-8") as fh:
+        arbol = ast.parse(fh.read())
+    for nodo in arbol.body:
+        if (isinstance(nodo, ast.Assign) and len(nodo.targets) == 1
+                and isinstance(nodo.targets[0], ast.Name) and nodo.targets[0].id == "version"
+                and isinstance(nodo.value, ast.Constant) and isinstance(nodo.value.value, str)):
+            texto = nodo.value.value.strip()
+            partes = texto.split(".")
+            if not (1 <= len(partes) <= 4 and all(p.isdigit() for p in partes)):
+                sys.exit(f"La versión '{texto}' de {APP} no es del tipo 3.1 o 3.1.2")
+            return texto
+    sys.exit(f"No encontré la línea  version = \"X.Y\"  en {APP}")
+
+
+def escribir_version_info(base, version):
+    """version_info.txt (metadatos del .exe) a partir de la versión del .py."""
+    numeros = [int(p) for p in version.split(".")] + [0, 0, 0]
+    tupla = tuple(numeros[:4])
+    anio = datetime.date.today().year
+    contenido = f"""# UTF-8
+# Lo genera build_pyinstaller.py a partir de  version = "{version}"  de {APP}: no editar a mano.
+VSVersionInfo(
+  ffi=FixedFileInfo(
+    filevers={tupla},
+    prodvers={tupla},
+    mask=0x3f,
+    flags=0x0,
+    OS=0x4,
+    fileType=0x1,
+    subtype=0x0,
+    date=(0, 0)
+  ),
+  kids=[
+    StringFileInfo([
+      StringTable('040904B0', [
+        StringStruct('CompanyName', 'Kevin González'),
+        StringStruct('FileDescription', 'DEUS MACHINA | TOOLS'),
+        StringStruct('FileVersion', '{version}'),
+        StringStruct('InternalName', '{NOMBRE}'),
+        StringStruct('LegalCopyright', '© {anio} Kevin González (DoMiNaTh0R). Licencia GNU AGPL v3.'),
+        StringStruct('OriginalFilename', '{NOMBRE}.exe'),
+        StringStruct('ProductName', 'DEUS MACHINA | TOOLS'),
+        StringStruct('ProductVersion', '{version}')
+      ])
+    ]),
+    VarFileInfo([VarStruct('Translation', [1033, 1200])])
+  ]
+)
+"""
+    with open(os.path.join(base, "version_info.txt"), "w", encoding="utf-8") as fh:
+        fh.write(contenido)
+    print(f"  [versión] {version}  ->  version_info.txt (archivo {'.'.join(map(str, tupla))})")
+
+
+def revisar_docs(base, version):
+    """Avisa (sin detener la compilación) si algún documento no menciona la versión actual."""
+    faltan = []
+    for rel in DOCS_CON_VERSION:
+        ruta = os.path.join(base, rel)
+        try:
+            with open(ruta, encoding="utf-8") as fh:
+                texto = fh.read()
+        except OSError:
+            faltan.append(f"{rel} (no existe)")
+            continue
+        if version not in texto:
+            faltan.append(rel)
+    for rel in faltan:
+        print(f"  [AVISO] {rel} no menciona la versión {version}: actualiza el documento.")
+    return not faltan
 
 
 def _path_de_compilacion():
@@ -324,11 +413,15 @@ def main():
     for requerido in (APP, os.path.join("imgtype", "1.ico")):
         if not os.path.exists(requerido):
             sys.exit(f"Falta '{requerido}' en {base}")
-    # version_info.txt es OPCIONAL: son los metadatos de versión del .exe
-    # (nombre del producto, copyright...). Si no está, se compila sin ellos.
-    hay_version = os.path.exists("version_info.txt")
-    if not hay_version:
-        print("  [AVISO] Sin 'version_info.txt': el .exe se compilará sin metadatos de versión.")
+    version = leer_version(base)
+    if "--version" in sys.argv[1:]:
+        print(version)
+        return
+    # Metadatos de versión del .exe (nombre del producto, copyright...): se
+    # regeneran en cada compilación con la versión del .py
+    escribir_version_info(base, version)
+    revisar_docs(base, version)
+    hay_version = True
 
     colectar_todo = _filtrar(COLECTAR_TODO, _paquete_instalado, "paquete")
     colectar_datos = _filtrar(COLECTAR_DATOS, _paquete_instalado, "paquete")
@@ -375,8 +468,8 @@ def main():
     revisar_dlls(dist)
     total = sum(os.path.getsize(os.path.join(r, f)) for r, _, fs in os.walk(dist) for f in fs)
     print(f"Tamaño total de la carpeta: {total / (1024 ** 3):.2f} GB")
-    print("Listo: dist\\" + NOMBRE + "\\" + NOMBRE + ".exe")
-    print("Recuerda copiar la carpeta 'tools' junto al .exe.")
+    print(f"Listo: dist\\{NOMBRE}\\{NOMBRE}.exe  (versión {version})")
+    print("Recuerda copiar la carpeta 'tools' junto al .exe (compilar_dmt.bat lo hace solo).")
 
 
 if __name__ == "__main__":

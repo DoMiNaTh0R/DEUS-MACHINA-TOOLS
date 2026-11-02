@@ -2,7 +2,7 @@
   <img src="imgtype/logo.png" alt="DEUS MACHINA | TOOLS" width="420">
 </p>
 
-<h1 align="center">DEUS MACHINA | TOOLS v3.0</h1>
+<h1 align="center">DEUS MACHINA | TOOLS v3.1</h1>
 
 <p align="center">
   Aplicación de escritorio (Windows) para procesar medios en local: video, audio, imágenes,
@@ -19,10 +19,6 @@
 **Instalador / Installer (~1.7 GB):**
 
 - **[GitHub Releases](https://github.com/DoMiNaTh0R/DEUS-MACHINA-TOOLS/releases/latest)**
-- **[Google Drive](https://drive.google.com/drive/folders/1Vr5GbW31KSOUGScupc5S8DhU_w5zGrFb)** (espejo / mirror)
-
-> Es el mismo instalador en los dos sitios.
-> It is the same installer in both places.
 
 ---
 
@@ -42,6 +38,8 @@
 
 Varios módulos pueden trabajar **a la vez**; los que cargan modelos de IA se turnan solos para no saturar la memoria, y un botón (en el menú, Transcripción, OCR y Quitar fondo) libera el modelo cargado cuando termina lo que está en curso.
 
+La app **busca actualizaciones** sola (como máximo una vez al día) y puede instalarlas en modo silencioso o normal, comprobando antes la huella SHA-256 y la firma digital del instalador.
+
 Detalle completo de cambios: **[CHANGELOG](imgtype/CHANGELOG.md)** · Documentación de usuario: **[README de la app](imgtype/README.md)**
 
 ---
@@ -49,7 +47,7 @@ Detalle completo de cambios: **[CHANGELOG](imgtype/CHANGELOG.md)** · Documentac
 ## Requisitos
 
 - Windows 10/11 de 64 bits
-- Python **3.13** (solo para compilar desde el código fuente)
+- Python **3.13** (3.13.17 o posterior; solo para compilar desde el código fuente). Python 3.14 todavía no sirve: PaddlePaddle no publica versión para 3.14 en Windows
 - GPU NVIDIA opcional: acelera transcripción y OCR (para OCR en GPU se necesita **Turing / RTX 20xx o posterior** y driver compatible con CUDA 12.9)
 - FFmpeg y Ghostscript (se descargan aparte, ver abajo)
 
@@ -62,18 +60,20 @@ Guía paso a paso: **[docs/COMPILAR.md](docs/COMPILAR.md)**
 Resumen rápido:
 
 ```bat
-:: 1) Crear el entorno con todas las dependencias (Python 3.13)
-crear_venv_dmt.bat
-
-:: 2) Descargar FFmpeg y Ghostscript y dejarlos en:
+:: 1) Descargar FFmpeg y Ghostscript y dejarlos en:
 ::    tools\ffmpeg\bin\ffmpeg.exe   y   tools\ghostscript\bin\gswin64c.exe
 
-:: 3) Ejecutar desde el código fuente
-build_env_DMT\Scripts\python.exe Deus_machina_tools.py
+:: 2) Todo en un paso: crea el entorno si falta (Python 3.13), compila y deja
+::    Instalador\DEUS_MACHINA_TOOLS listo para Inno Setup (con tools y documentos)
+compilar_dmt.bat
 
-:: 4) O compilar el ejecutable
+:: O por partes:
+crear_venv_dmt.bat
+build_env_DMT\Scripts\python.exe Deus_machina_tools.py
 build_env_DMT\Scripts\python.exe build_pyinstaller.py
 ```
+
+La versión se escribe una sola vez, en `version = "…"` de `Deus_machina_tools.py`: `build_pyinstaller.py` la pone en los metadatos del `.exe` y el script de Inno Setup la lee del `.exe`.
 
 ---
 
@@ -82,10 +82,11 @@ build_env_DMT\Scripts\python.exe build_pyinstaller.py
 | Archivo / carpeta | Para qué es |
 |---|---|
 | `Deus_machina_tools.py` | Todo el programa (interfaz + módulos + motores) |
-| `crear_venv_dmt.bat` | Crea el entorno virtual `build_env_DMT` con el stack CUDA 12.9 |
+| `compilar_dmt.bat` | Compilación completa: entorno (si falta), PyInstaller y carpeta del instalador con `tools` y documentos |
+| `crear_venv_dmt.bat` | Crea (o rehace) el entorno virtual `build_env_DMT` con el stack CUDA 12.9 |
 | `requirements.txt` · `constraints.txt` | Dependencias exactas y versiones fijadas |
 | `cuda_necesarias.txt` | Lista de DLL de NVIDIA que la app necesita y que se empaquetan |
-| `build_pyinstaller.py` | Compila el ejecutable con PyInstaller |
+| `build_pyinstaller.py` | Compila el ejecutable con PyInstaller (la versión sale del código) |
 | `imgtype/` | Recursos de la app (icono, logo, fuentes) y documentación que la app muestra: README, CHANGELOG, LICENSE, LICENSE-EXCEPTION, EULA y THIRD_PARTY_NOTICES |
 | `docs/COMPILAR.md` | Guía de compilación |
 | `LICENSE` | Texto completo de la GNU AGPL-3.0 |
@@ -122,17 +123,17 @@ El archivo [LICENSE-EXCEPTION.txt](LICENSE-EXCEPTION.txt) recoge el **permiso ad
 
 ## In English
 
-**DEUS MACHINA | TOOLS v3.0** is a Windows desktop app for local media processing: video and audio conversion, image tools (including background removal), PDF utilities, OCR (PaddleOCR / RapidOCR), AI transcription (faster-whisper), YouTube/Spotify downloading, batch renaming and a metadata lab. Everything runs locally; no telemetry.
+**DEUS MACHINA | TOOLS v3.1** is a Windows desktop app for local media processing: video and audio conversion, image tools (including background removal), PDF utilities, OCR (PaddleOCR / RapidOCR), AI transcription (faster-whisper), YouTube/Spotify downloading, batch renaming and a metadata lab. Everything runs locally; no telemetry. It checks GitHub for updates at most once a day and verifies the installer's SHA-256 hash and digital signature before installing.
 
 - **Source code:** this repository
-- **Installer (~1.7 GB):** [GitHub Releases](https://github.com/DoMiNaTh0R/DEUS-MACHINA-TOOLS/releases/latest) or [Google Drive](https://drive.google.com/drive/folders/1Vr5GbW31KSOUGScupc5S8DhU_w5zGrFb) *(mirror, same file)*
-- **Build from source:** see [docs/COMPILAR.md](docs/COMPILAR.md)
+- **Installer (~1.7 GB):** [GitHub Releases](https://github.com/DoMiNaTh0R/DEUS-MACHINA-TOOLS/releases/latest)
+- **Build from source:** see [docs/COMPILAR.md](docs/COMPILAR.md) — Python 3.13 (3.13.17 or later; not 3.14 yet, PaddlePaddle has no Windows build for it), then `compilar_dmt.bat`
 - **License:** GNU AGPL-3.0 or later — the app links PyMuPDF (AGPL-3.0) in-process, so the whole work is AGPL. An [additional permission under section 7](LICENSE-EXCEPTION.txt) covers combining the program with NVIDIA's CUDA/cuDNN runtimes, which remain under NVIDIA's own licenses. Full third-party license texts in [imgtype/THIRD_PARTY_NOTICES.txt](imgtype/THIRD_PARTY_NOTICES.txt).
 
 ---
 
 ## Autor
 
-**Kevin González (DoMiNaTh0R)** — DoMiNaTh0RRoyale@gmail.com
+**Kevin González (DoMiNaTh0R)** — [soporte y consultas / support and inquiries](https://github.com/DoMiNaTh0R/DEUS-MACHINA-TOOLS/issues)
 
 © 2026 Kevin González. Publicado bajo GNU AGPL-3.0.

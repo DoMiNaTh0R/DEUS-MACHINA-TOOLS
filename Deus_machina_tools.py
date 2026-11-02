@@ -70,7 +70,9 @@ from PIL import Image, ImageOps, ImageTk
 
 # ==== PEGAR ESTO ANTES DE self.finished = False ====
 
-version = "3.0"
+# Única fuente de la versión: build_pyinstaller.py la lee de aquí para los
+# metadatos del .exe, y el instalador de Inno Setup la toma del .exe.
+version = "3.1"
 
 
 
@@ -312,7 +314,7 @@ libs_by_group = {
                     "url": "https://python-pillow.github.io/",
                     "legal": "Proyecto bajo licencia PIL/MIT. Permite uso comercial, redistribución y modificación.",
                     "modname": "PIL",
-                    "version": "12.3.0",
+                    "version": "13.0.0",
                 }
             ],
 
@@ -436,7 +438,7 @@ libs_by_group = {
                     ),
                     "gpu": "En DEUS MACHINA se ejecuta en CPU mediante ONNX Runtime.",
                     "modname": "rembg",
-                    "version": "2.0.84",
+                    "version": "2.0.86",
                 }
                 ,
             ],
@@ -457,7 +459,7 @@ libs_by_group = {
                         "Se distribuye con su licencia y oferta de código fuente."
                     ),
                     "modname": None,
-                    "version": "9.0.1-full_build-www.gyan.dev",
+                    "version": "9.0.2-full_build-www.gyan.dev",
                 }
 
                 ,
@@ -488,7 +490,8 @@ libs_by_group = {
                     "desc": (
                         "Programa que ejecuta JavaScript fuera del navegador. YouTube exige resolver "
                         "pequeños retos en JavaScript antes de entregar los videos; yt-dlp usa Deno "
-                        "para resolverlos. Se descarga solo la primera vez que hace falta."
+                        "para resolverlos. Se descarga la primera vez que hace falta y se mantiene "
+                        "al día solo (con la firma SHA-256 que publica Deno verificada)."
                     ),
                     "url": "https://deno.com/",
                     "legal": (
@@ -496,7 +499,7 @@ libs_by_group = {
                         "conservando el aviso de copyright. Se usa como programa externo."
                     ),
                     "modname": None,
-                    "version": "Última estable (descarga automática)",
+                    "version": "Última estable (descarga y actualización automáticas)",
                 }
                 ,
                 {
@@ -529,7 +532,7 @@ libs_by_group = {
                     "url": "https://github.com/lexiforest/curl_cffi",
                     "legal": "Licencia MIT: uso comercial sin restricciones manteniendo la atribución.",
                     "modname": "curl_cffi",
-                    "version": "0.15.0",
+                    "version": "0.17.0",
                 }
                 ,
                 {
@@ -544,7 +547,7 @@ libs_by_group = {
                     "url": "https://github.com/spotDL/spotify-downloader",
                     "legal": "Licencia MIT: uso comercial, modificación y redistribución permitidos.",
                     "modname": "spotdl",
-                    "version": "4.5.2",
+                    "version": "4.6.0",
                 }
                 ,
             ],
@@ -563,29 +566,29 @@ libs_by_group = {
                         "PyMuPDF se enlaza DIRECTAMENTE como librería dentro del proceso principal, "
                         "no es un programa aparte. Por eso DEUS MACHINA | TOOLS se publica bajo la "
                         "misma licencia AGPL-3.0, y su código fuente completo está disponible en "
-                        "https://github.com/DoMiNaTh0R/DEUS-MACHINA-TOOLS "
-                        "(también se envía por correo a quien lo pida: DoMiNaTh0RRoyale@gmail.com)."
+                        "https://github.com/DoMiNaTh0R/DEUS-MACHINA-TOOLS."
                     ),
                     "modname": "pymupdf",
                     "version": "1.28.2",
                 }
                 ,
                 {
-                    "key": "pypdf2",
-                    "name": "PyPDF2",
+                    "key": "pypdf",
+                    "name": "pypdf",
                     "role": "Edición/gestión PDF básica",
-                    "license": "BSD",
+                    "license": "BSD-3-Clause",
                     "desc": (
-                        "Librería liviana para operaciones de estructura PDF: unir, dividir, "
-                        "extraer metadatos, rotar páginas y leer información interna."
+                        "Librería liviana para operaciones de estructura PDF. En DEUS MACHINA se usa "
+                        "para extraer páginas (dividir PDF). Es la continuación oficial de PyPDF2, "
+                        "que quedó abandonada."
                     ),
-                    "url": "https://pypdf2.readthedocs.io/",
+                    "url": "https://pypdf.readthedocs.io/",
                     "legal": (
                         "Licencia BSD de 3 cláusulas: uso comercial y privado permitido, "
                         "redistribución libre con atribución mínima."
                     ),
-                    "modname": "PyPDF2",
-                    "version": "3.0.1",  
+                    "modname": "pypdf",
+                    "version": "6.21.4",
                 }
                 ,
                 {
@@ -606,7 +609,7 @@ libs_by_group = {
                         "'Mera Agregación' para mantener la independencia del código fuente."
                     ),
                     "modname": "Ghostscript (Binario CLI)",
-                    "version": "10.6.0"
+                    "version": "10.08.0"
                 },
             ],
             "Metadatos / Office": [
@@ -1420,7 +1423,7 @@ def _cuda_iniciar():
     return ligero
 faster_whisper = None
 yt_dlp = None
-PyPDF2 = None
+pypdf = None
 fitz = None
 cv2 = None
 np = None
@@ -1496,15 +1499,89 @@ def _avisar_dlls_nvidia_de_pip():
         print(f"[GPU SETUP] No se pudo revisar DLLs NVIDIA de pip: {e}")
 
 
+def _dmt_localappdata():
+    return os.environ.get("LOCALAPPDATA") or os.path.join(os.path.expanduser("~"), "AppData", "Local")
+
+
 def _dmt_base_dir():
-    """Carpeta persistente y escribible: %LOCALAPPDATA%/DeusMachinaTools (misma base que yt_dlp_live)."""
-    _localappdata = os.environ.get("LOCALAPPDATA") or os.path.join(os.path.expanduser("~"), "AppData", "Local")
-    _base = os.path.join(_localappdata, "DeusMachinaTools")
+    """
+    Carpeta persistente y escribible de la app (config, logs, yt_dlp_live,
+    rembg_models, tools\\deno...): %LOCALAPPDATA%\\DEUS MACHINA\\DeusMachinaTools.
+    Hasta la v3.0 era %LOCALAPPDATA%\\DeusMachinaTools (ver _dmt_migrar_datos_viejos).
+    """
+    _base = os.path.join(_dmt_localappdata(), "DEUS MACHINA", "DeusMachinaTools")
     try:
         os.makedirs(_base, exist_ok=True)
     except Exception:
         pass
     return _base
+
+
+def _dmt_fusionar_carpeta(origen, destino):
+    """
+    Mueve el contenido de 'origen' a 'destino' sin pisar nada. Devuelve
+    (en_uso, repetidos): lo que no se pudo mover porque estaba en uso, y lo que
+    no se movió porque el destino ya tenía un elemento con ese nombre.
+    """
+    en_uso = repetidos = 0
+    os.makedirs(destino, exist_ok=True)
+    for entrada in list(os.scandir(origen)):
+        nuevo = os.path.join(destino, entrada.name)
+        if not os.path.lexists(nuevo):
+            try:
+                os.rename(entrada.path, nuevo)        # misma unidad: instantáneo
+            except OSError:
+                en_uso += 1
+        elif entrada.is_dir(follow_symlinks=False) and os.path.isdir(nuevo):
+            u, r = _dmt_fusionar_carpeta(entrada.path, nuevo)
+            en_uso, repetidos = en_uso + u, repetidos + r
+            if u == r == 0:
+                try:
+                    os.rmdir(entrada.path)
+                except OSError:
+                    en_uso += 1
+        else:
+            repetidos += 1
+    return en_uso, repetidos
+
+
+def _dmt_migrar_datos_viejos():
+    """
+    Desde la v3.1 los datos van en %LOCALAPPDATA%\\DEUS MACHINA\\DeusMachinaTools.
+    Si existe la carpeta de antes (%LOCALAPPDATA%\\DeusMachinaTools), se mueve
+    entera la primera vez (un solo rename). Si ya existían las dos (se volvió a
+    abrir una versión vieja), se fusionan sin pisar lo de la carpeta nueva, y
+    lo repetido de la vieja se guarda en "_carpeta_vieja_<fecha>" dentro de la
+    nueva (no se borra nada). Lo que estaba en uso se reintenta al siguiente
+    arranque. Lo que ya haya en "DEUS MACHINA" (otras apps) no se toca.
+    Cuando ya no hay carpeta vieja, cuesta una sola comprobación.
+    Corre antes de abrir el log de la sesión: devuelve el mensaje para escribirlo
+    después (o None si no había nada que mover).
+    """
+    vieja = os.path.join(_dmt_localappdata(), "DeusMachinaTools")
+    if not os.path.isdir(vieja):
+        return None
+    padre = os.path.join(_dmt_localappdata(), "DEUS MACHINA")
+    nueva = os.path.join(padre, "DeusMachinaTools")
+    try:
+        os.makedirs(padre, exist_ok=True)
+        if not os.path.lexists(nueva):
+            try:
+                os.rename(vieja, nueva)
+                return f"[Datos] Carpeta movida a {nueva}"
+            except OSError:
+                pass        # algo en uso: se mueve elemento por elemento
+        en_uso, repetidos = _dmt_fusionar_carpeta(vieja, nueva)
+        if en_uso:
+            return f"[Datos] {en_uso} elementos de {vieja} siguen en uso; se reintenta en el próximo arranque"
+        if repetidos:
+            restos = os.path.join(nueva, "_carpeta_vieja_" + time.strftime("%Y%m%d_%H%M%S"))
+            os.rename(vieja, restos)
+            return f"[Datos] Lo repetido de la carpeta vieja quedó en {restos}"
+        os.rmdir(vieja)
+        return f"[Datos] Carpeta vieja fusionada en {nueva}"
+    except Exception as e:
+        return f"[Datos] No se pudo mover la carpeta de datos vieja: {e}"
 
 # ------------------------------------------------------------------------------
 #   TEMPORALES: una carpeta por sesión dentro de %TEMP%\DeusMachinaTools
@@ -1734,15 +1811,70 @@ def _dmt_activar_faulthandler(flujo=None):
         pass
 
 
+def _dmt_usar_certificados_del_sistema():
+    """
+    Hace que las conexiones HTTPS de Python (requests, yt-dlp, spotDL, Hugging
+    Face...) validen con el almacén de certificados de Windows, no solo con la
+    lista de certifi. Así funcionan también en equipos con un antivirus que
+    inspecciona HTTPS (Avast presenta su propio certificado) o con proxy de
+    empresa, y se respetan los bloqueos que publica Microsoft. La verificación
+    sigue activa: un certificado vencido, falso o de otro sitio se rechaza igual.
+    Si algo falla, se sigue con certifi.
+    """
+    try:
+        _dmt_certificados_para_curl()
+    except Exception as e:
+        print(f"[Red] curl_cffi usará solo la lista de certifi: {e}")
+    try:
+        import truststore
+        truststore.inject_into_ssl()
+    except Exception as e:
+        print(f"[Red] Se usará la lista de certificados incluida (certifi): {e}")
+
+
+def _dmt_certificados_para_curl():
+    """
+    curl_cffi (spotDL con Spotify, TikTok...) trae su propio motor TLS y no pasa
+    por truststore. Se le da certifi más las raíces instaladas en este equipo
+    para servidores (la del antivirus o la del proxy de empresa), SIN las del
+    programa público de Microsoft (AuthRoot): esas no se pueden fijar aquí con sus
+    bloqueos, y las públicas que hacen falta ya vienen en certifi.
+    Los procesos hijos (spotDL, motor OCR) heredan la variable de entorno.
+    """
+    if os.name != "nt" or any(os.environ.get(v) for v in
+                              ("SSL_CERT_FILE", "CURL_CA_BUNDLE", "REQUESTS_CA_BUNDLE")):
+        return
+    import certifi
+    import ssl
+    del_programa = {der for der, codif, _ in ssl.enum_certificates("AUTHROOT") if codif == "x509_asn"}
+    locales = [ssl.DER_cert_to_PEM_cert(der)
+               for der, codif, usos in ssl.enum_certificates("ROOT")
+               if codif == "x509_asn" and der not in del_programa
+               and (usos is True or "1.3.6.1.5.5.7.3.1" in usos)]   # autenticación de servidor
+    with open(certifi.where(), encoding="utf-8") as f:
+        contenido = f.read().rstrip() + "\n" + "".join(locales)
+    ruta = os.path.join(tempfile.gettempdir(), "dmt_cacert.pem")
+    temporal = f"{ruta}.{os.getpid()}"
+    with open(temporal, "w", encoding="utf-8", newline="\n") as f:
+        f.write(contenido)
+    os.replace(temporal, ruta)
+    # Primero la variable: si curl_cffi se está importando en otro hilo, la lee al terminar
+    os.environ["CURL_CA_BUNDLE"] = ruta
+    curl = sys.modules.get("curl_cffi.curl")
+    if curl is not None:
+        curl.DEFAULT_CACERT = ruta
+
+
 def _dmt_preparar_stdio_hijo():
     """
     Proceso hijo del motor OCR: en builds sin consola su salida (y cualquier caída
-    nativa) va a %LOCALAPPDATA%\\DeusMachinaTools\\logs\\motor_ocr.log.
+    nativa) va a %LOCALAPPDATA%\\DEUS MACHINA\\DeusMachinaTools\\logs\\motor_ocr.log.
     Se ejecuta al importar el script, ANTES de que multiprocessing arranque el hijo.
     """
     es_hijo = ("--multiprocessing-fork" in sys.argv) or (__name__ == "__parents_main__")
     if not es_hijo:
         return
+    _dmt_usar_certificados_del_sistema()
     if not (_dmt_flujo_sin_salida(sys.stdout) or _dmt_flujo_sin_salida(sys.stderr)):
         _dmt_activar_faulthandler()       # desarrollo: hay consola
         return
@@ -1766,7 +1898,7 @@ def _dmt_preparar_stdio_app():
     Nuitka (--windows-console-mode=disable) los manda a NUL. Algunas librerías
     (barras de progreso de descargas, logs de Paddle...) fallan con None, y sin
     salida no hay forma de diagnosticar. Aquí se mandan a
-    %LOCALAPPDATA%\\DeusMachinaTools\\logs\\ultima_sesion.log (se guardan solo
+    %LOCALAPPDATA%\\DEUS MACHINA\\DeusMachinaTools\\logs\\ultima_sesion.log (se guardan solo
     las dos últimas sesiones).
     """
     def _sin_salida(flujo):
@@ -1799,7 +1931,7 @@ def _dmt_preparar_stdio_app():
 class _DMTBuscadorYtDlpLive:
     """
     Da prioridad a la copia actualizada de yt-dlp / yt-dlp-ejs que el
-    actualizador deja en %LOCALAPPDATA%\\DeusMachinaTools\\yt_dlp_live.
+    actualizador deja en %LOCALAPPDATA%\\DEUS MACHINA\\DeusMachinaTools\\yt_dlp_live.
     Con Nuitka los módulos compilados se resuelven ANTES que sys.path, así que
     sin este buscador la actualización "se instalaba" pero se seguía usando la
     versión compilada. Con PyInstaller no estorba (resuelve igual).
@@ -1830,6 +1962,11 @@ class _DMTBuscadorYtDlpLive:
 
 
 _YTDLP_LIVE_FINDER = None
+
+
+def _ytdlp_live_dir():
+    """Copia actualizada de yt-dlp / yt-dlp-ejs (escribible aunque el .exe esté en Archivos de programa)."""
+    return os.path.join(_dmt_base_dir(), "yt_dlp_live")
 
 
 def _instalar_buscador_ytdlp_live(carpeta):
@@ -1897,9 +2034,7 @@ def configurar_ffmpeg_local():
     # ── yt-dlp live (actualizaciones persistentes en .exe) ───────────────
     # Ruta en AppData/Local para que siempre sea escribible desde el .exe,
     # sin importar dónde esté instalado el ejecutable.
-    _localappdata = os.environ.get("LOCALAPPDATA") or os.path.join(os.path.expanduser("~"), "AppData", "Local")
-    _dmt_base     = os.path.join(_localappdata, "DeusMachinaTools")
-    yt_live       = os.path.join(_dmt_base, "yt_dlp_live")
+    yt_live = _ytdlp_live_dir()
 
     # Crear la carpeta si no existe (primera vez)
     try:
@@ -1935,7 +2070,7 @@ def configurar_deno_local():
     Busca un binario de Deno (runtime de JavaScript que yt-dlp necesita para
     resolver los retos de YouTube) en, en este orden:
       1) tools/deno/ junto al ejecutable (por si se empaqueta a mano, igual que ffmpeg)
-      2) %LOCALAPPDATA%/DeusMachinaTools/tools/deno/ (copia auto-descargada en una sesión previa)
+      2) %LOCALAPPDATA%/DEUS MACHINA/DeusMachinaTools/tools/deno/ (copia auto-descargada en una sesión previa)
       3) el PATH del sistema
     Si aparece en (1) o (2), agrega esa carpeta al PATH. NO descarga nada aquí
     (de eso se encarga asegurar_deno_disponible(), y solo si el módulo de
@@ -1977,9 +2112,10 @@ def asegurar_deno_disponible(status_cb=None):
     Si Deno ya está disponible (PATH) no hace nada. Si no, lo descarga UNA
     sola vez desde el release oficial de GitHub (binario oficial, licencia
     MIT, el mismo que instala el script oficial de Deno) a
-    %LOCALAPPDATA%/DeusMachinaTools/tools/deno/ y lo agrega al PATH de este
-    proceso. Si falla (sin internet, etc.) no rompe nada: yt-dlp sigue
-    funcionando igual que hoy, solo sin el runtime de JS.
+    %LOCALAPPDATA%/DEUS MACHINA/DeusMachinaTools/tools/deno/, comprueba su
+    SHA-256 y lo agrega al PATH de este proceso. Si falla (sin internet, etc.)
+    no rompe nada: yt-dlp sigue funcionando igual que hoy, solo sin el runtime
+    de JS. Las versiones nuevas las instala _deno_actualizar_si_hace_falta().
     Devuelve True si Deno quedó disponible, False si no.
     """
     def _avisar(msg):
@@ -1997,45 +2133,320 @@ def asegurar_deno_disponible(status_cb=None):
     with _DENO_DOWNLOAD_LOCK:
         if shutil.which("deno"):
             return True  # otro hilo ya lo dejó listo mientras esperábamos el lock
-
-        import urllib.request as _req, zipfile as _zip
-
-        destino_dir = os.path.join(_dmt_base_dir(), "tools", "deno")
-        zip_path = os.path.join(destino_dir, "_deno_download.zip")
         try:
-            os.makedirs(destino_dir, exist_ok=True)
             _avisar("Descargando Deno (una sola vez, ~40 MB)...")
-            url = "https://github.com/denoland/deno/releases/latest/download/deno-x86_64-pc-windows-msvc.zip"
-            zip_path = os.path.join(destino_dir, "_deno_download.zip")
-            peticion = _req.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-            with _req.urlopen(peticion, timeout=90) as resp, open(zip_path, "wb") as f:
-                shutil.copyfileobj(resp, f)
-
-            _avisar("Extrayendo Deno...")
-            with _zip.ZipFile(zip_path, "r") as z:
-                z.extractall(destino_dir)
-            os.remove(zip_path)
-
-            exe = os.path.join(destino_dir, "deno.exe")
-            if not os.path.isfile(exe):
-                raise RuntimeError("El zip descargado no contenía deno.exe")
-
-            if destino_dir not in os.environ.get("PATH", "").split(os.pathsep):
-                os.environ["PATH"] = destino_dir + os.pathsep + os.environ.get("PATH", "")
-
-            print(f"✅ [DENO SETUP] Descargado e instalado en: {exe}")
+            _deno_instalar(_deno_release_reciente())
             _avisar("Deno listo.")
             return True
         except Exception as e:
             print(f"⚠️ [DENO SETUP] No se pudo descargar Deno automáticamente: {e}")
             _avisar("No se pudo descargar Deno (se continúa sin él).")
             return False
-        finally:
-            try:
-                if os.path.exists(zip_path):
-                    os.remove(zip_path)
-            except OSError:
-                pass
+
+
+# ------------------------------------------------------------------------------
+#   ACTUALIZACIONES: de la app (release de GitHub) y de Deno
+# ------------------------------------------------------------------------------
+#   Se consultan en segundo plano como máximo una vez al día (App._upd_*).
+#   Todo lo que se descarga se verifica antes de usarse: tamaño y SHA-256 que
+#   publica GitHub y, en el instalador de la app, además la firma Authenticode
+#   con el mismo certificado que el .exe que está corriendo.
+_DMT_REPO_GITHUB = "DoMiNaTh0R/DEUS-MACHINA-TOOLS"
+_DMT_PATRON_INSTALADOR = re.compile(r"^DeusMachinaTools_Setup_v(\d+(?:\.\d+)*)\.exe$", re.IGNORECASE)
+# Huella (SHA-1) del certificado con el que Kevin González firma el .exe y el
+# instalador. Es autofirmado: en otros equipos Windows lo marca como "raíz no
+# confiable", así que la confianza se basa en esta huella, no en el almacén.
+_DMT_FIRMAS_CONFIABLES = {"8965B395B96AA141A432BEB4A5FFA54578E311EE"}
+_DMT_UPDATE_INTERVALO = 24 * 3600
+_DENO_ASSET = "deno-x86_64-pc-windows-msvc.zip"
+
+
+def _dmt_version_tupla(texto):
+    """'v3.1' -> (3, 1); '3.1.0.0' -> (3, 1). Los ceros finales no cuentan."""
+    t = [int(n) for n in re.findall(r"\d+", str(texto or ""))[:4]]
+    while len(t) > 1 and t[-1] == 0:
+        t.pop()
+    return tuple(t) or (0,)
+
+
+def _dmt_github_json(url, timeout=10):
+    import urllib.request as _req
+    peticion = _req.Request(url, headers={"Accept": "application/vnd.github+json",
+                                          "User-Agent": f"DeusMachinaTools/{version}"})
+    with _req.urlopen(peticion, timeout=timeout) as r:
+        return json.loads(r.read().decode("utf-8"))
+
+
+def _dmt_sha256_de_digest(digest):
+    digest = str(digest or "").strip().lower()
+    return digest.split(":", 1)[1] if digest.startswith("sha256:") else ""
+
+
+def _dmt_sha256_archivo(ruta, avance=None):
+    import hashlib as _hl
+    h = _hl.sha256()
+    hecho = 0
+    with open(ruta, "rb") as f:
+        for bloque in iter(lambda: f.read(4 << 20), b""):
+            h.update(bloque)
+            hecho += len(bloque)
+            if avance:
+                avance(hecho)
+    return h.hexdigest().lower()
+
+
+def _dmt_release_app():
+    """
+    Último release publicado de la app (sin borradores ni pre-releases):
+    {version, nombre, url, tamano, sha256, pagina, notas} o None si no trae instalador.
+    """
+    datos = _dmt_github_json(f"https://api.github.com/repos/{_DMT_REPO_GITHUB}/releases/latest")
+    if datos.get("draft") or datos.get("prerelease"):
+        return None
+    for a in datos.get("assets") or []:
+        m = _DMT_PATRON_INSTALADOR.match(a.get("name") or "")
+        if not m or not a.get("browser_download_url"):
+            continue
+        return {
+            "version": str(datos.get("tag_name") or m.group(1)).strip().lstrip("vV") or m.group(1),
+            "nombre": a["name"],
+            "url": a["browser_download_url"],
+            "tamano": int(a.get("size") or 0),
+            "sha256": _dmt_sha256_de_digest(a.get("digest")),
+            "pagina": datos.get("html_url") or f"https://github.com/{_DMT_REPO_GITHUB}/releases",
+            "notas": str(datos.get("body") or "")[:4000],
+        }
+    return None
+
+
+def _dmt_firma_authenticode(ruta):
+    """
+    Firma Authenticode de un .exe con las API de Windows (WinVerifyTrust), sin
+    PowerShell (el antivirus de algunos equipos lo bloquea). Devuelve
+    {"estado", "huella", "nombre", "codigo"}; estado es:
+      "valida"            firmado, intacto y con certificado de confianza en este equipo
+      "raiz_no_confiable" firmado e intacto, pero el certificado no está en los de
+                          confianza de este equipo (lo normal con un certificado propio)
+      "sin_firma" | "alterada" | "error"
+    huella: SHA-1 en hexadecimal del certificado del firmante ("" si no hay).
+    """
+    resultado = {"estado": "error", "huella": "", "nombre": "", "codigo": 0}
+    if os.name != "nt":
+        return resultado
+    from ctypes import wintypes
+
+    class GUID(ctypes.Structure):
+        _fields_ = [("Data1", wintypes.DWORD), ("Data2", wintypes.WORD),
+                    ("Data3", wintypes.WORD), ("Data4", ctypes.c_ubyte * 8)]
+
+    class WINTRUST_FILE_INFO(ctypes.Structure):
+        _fields_ = [("cbStruct", wintypes.DWORD), ("pcwszFilePath", wintypes.LPCWSTR),
+                    ("hFile", wintypes.HANDLE), ("pgKnownSubject", ctypes.c_void_p)]
+
+    class WINTRUST_DATA(ctypes.Structure):
+        _fields_ = [("cbStruct", wintypes.DWORD), ("pPolicyCallbackData", ctypes.c_void_p),
+                    ("pSIPClientData", ctypes.c_void_p), ("dwUIChoice", wintypes.DWORD),
+                    ("fdwRevocationChecks", wintypes.DWORD), ("dwUnionChoice", wintypes.DWORD),
+                    ("pFile", ctypes.POINTER(WINTRUST_FILE_INFO)), ("dwStateAction", wintypes.DWORD),
+                    ("hWVTStateData", wintypes.HANDLE), ("pwszURLReference", wintypes.LPCWSTR),
+                    ("dwProvFlags", wintypes.DWORD), ("dwUIContext", wintypes.DWORD),
+                    ("pSignatureSettings", ctypes.c_void_p)]
+
+    class CRYPT_PROVIDER_CERT(ctypes.Structure):      # solo los campos que se usan
+        _fields_ = [("cbStruct", wintypes.DWORD), ("pCert", ctypes.c_void_p)]
+
+    class CRYPT_PROVIDER_SGNR(ctypes.Structure):      # solo los campos que se usan
+        _fields_ = [("cbStruct", wintypes.DWORD), ("sftVerifyAsOf", wintypes.FILETIME),
+                    ("csCertChain", wintypes.DWORD),
+                    ("pasCertChain", ctypes.POINTER(CRYPT_PROVIDER_CERT))]
+
+    # WINTRUST_ACTION_GENERIC_VERIFY_V2 {00AAC56B-CD44-11d0-8CC2-00C04FC295EE}
+    accion = GUID(0x00AAC56B, 0xCD44, 0x11D0,
+                  (ctypes.c_ubyte * 8)(0x8C, 0xC2, 0x00, 0xC0, 0x4F, 0xC2, 0x95, 0xEE))
+    info = WINTRUST_FILE_INFO(ctypes.sizeof(WINTRUST_FILE_INFO), os.path.abspath(ruta), None, None)
+    datos = WINTRUST_DATA()
+    datos.cbStruct = ctypes.sizeof(WINTRUST_DATA)
+    datos.dwUIChoice = 2                    # WTD_UI_NONE
+    datos.fdwRevocationChecks = 0           # WTD_REVOKE_NONE
+    datos.dwUnionChoice = 1                 # WTD_CHOICE_FILE
+    datos.pFile = ctypes.pointer(info)
+    datos.dwStateAction = 1                 # WTD_STATEACTION_VERIFY
+    datos.dwProvFlags = 0x1000 | 0x10       # solo caché de red, sin revocación
+
+    wintrust = ctypes.WinDLL("wintrust")
+    crypt32 = ctypes.WinDLL("crypt32")
+    wintrust.WinVerifyTrust.argtypes = [wintypes.HWND, ctypes.POINTER(GUID), ctypes.c_void_p]
+    wintrust.WinVerifyTrust.restype = ctypes.c_long
+    wintrust.WTHelperProvDataFromStateData.argtypes = [wintypes.HANDLE]
+    wintrust.WTHelperProvDataFromStateData.restype = ctypes.c_void_p
+    wintrust.WTHelperGetProvSignerFromChain.argtypes = [ctypes.c_void_p, wintypes.DWORD,
+                                                        wintypes.BOOL, wintypes.DWORD]
+    wintrust.WTHelperGetProvSignerFromChain.restype = ctypes.POINTER(CRYPT_PROVIDER_SGNR)
+    crypt32.CertGetCertificateContextProperty.argtypes = [ctypes.c_void_p, wintypes.DWORD,
+                                                          ctypes.c_void_p, ctypes.POINTER(wintypes.DWORD)]
+    crypt32.CertGetCertificateContextProperty.restype = wintypes.BOOL
+    crypt32.CertGetNameStringW.argtypes = [ctypes.c_void_p, wintypes.DWORD, wintypes.DWORD,
+                                           ctypes.c_void_p, wintypes.LPWSTR, wintypes.DWORD]
+    crypt32.CertGetNameStringW.restype = wintypes.DWORD
+
+    codigo = wintrust.WinVerifyTrust(None, ctypes.byref(accion), ctypes.byref(datos)) & 0xFFFFFFFF
+    resultado["codigo"] = codigo
+    try:
+        if codigo == 0:
+            resultado["estado"] = "valida"
+        elif codigo in (0x800B0109, 0x800B010A):   # CERT_E_UNTRUSTEDROOT / CERT_E_CHAINING
+            # El contenido ya se comprobó (si estuviera alterado daría BAD_DIGEST);
+            # solo falta confianza en el certificado, que aquí se fija por huella
+            resultado["estado"] = "raiz_no_confiable"
+        elif codigo == 0x800B0100:          # TRUST_E_NOSIGNATURE
+            resultado["estado"] = "sin_firma"
+        elif codigo in (0x80096010, 0x80096011, 0x800B0004):  # BAD_DIGEST / NO_SIGNER_CERT / SUBJECT_NOT_TRUSTED
+            resultado["estado"] = "alterada"
+        if resultado["estado"] in ("valida", "raiz_no_confiable"):
+            prov = wintrust.WTHelperProvDataFromStateData(datos.hWVTStateData)
+            sgnr = wintrust.WTHelperGetProvSignerFromChain(prov, 0, False, 0) if prov else None
+            if sgnr and sgnr.contents.csCertChain and sgnr.contents.pasCertChain:
+                cert = sgnr.contents.pasCertChain[0].pCert
+                buf = (ctypes.c_ubyte * 20)()
+                tam = wintypes.DWORD(20)
+                if crypt32.CertGetCertificateContextProperty(cert, 3, buf, ctypes.byref(tam)):  # CERT_SHA1_HASH_PROP_ID
+                    resultado["huella"] = bytes(buf[:tam.value]).hex().upper()
+                nombre = ctypes.create_unicode_buffer(256)
+                if crypt32.CertGetNameStringW(cert, 4, 0, None, nombre, 256) > 1:  # SIMPLE_DISPLAY
+                    resultado["nombre"] = nombre.value
+            if not resultado["huella"]:
+                resultado["estado"] = "error"
+    finally:
+        datos.dwStateAction = 2             # WTD_STATEACTION_CLOSE
+        wintrust.WinVerifyTrust(None, ctypes.byref(accion), ctypes.byref(datos))
+    return resultado
+
+
+def _dmt_firma_es_nuestra(firma):
+    """Firmado, intacto y con el certificado de la app."""
+    return (firma.get("estado") in ("valida", "raiz_no_confiable")
+            and firma.get("huella", "").upper() in _DMT_FIRMAS_CONFIABLES)
+
+
+# --- Deno -----------------------------------------------------------------------
+def _deno_dir_propio():
+    """Copia de Deno que descarga y mantiene la app (la del sistema no se toca)."""
+    return os.path.join(_dmt_base_dir(), "tools", "deno")
+
+
+def _deno_version_de(exe):
+    try:
+        r = subprocess.run([exe, "--version"], capture_output=True, text=True, timeout=30,
+                           creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        m = re.search(r"deno\s+(\d+(?:\.\d+)+)", r.stdout or "")
+        return m.group(1) if m else None
+    except Exception:
+        return None
+
+
+def _deno_release_reciente():
+    """Último Deno estable para Windows x64: {version, url, tamano, sha256}."""
+    import urllib.request as _req
+    datos = _dmt_github_json("https://api.github.com/repos/denoland/deno/releases/latest")
+    activos = {a.get("name"): a for a in datos.get("assets") or []}
+    zip_info = activos.get(_DENO_ASSET)
+    if not zip_info:
+        raise RuntimeError("El release de Deno no trae el zip de Windows")
+    sha = _dmt_sha256_de_digest(zip_info.get("digest"))
+    if not sha and activos.get(_DENO_ASSET + ".sha256sum"):
+        # Releases sin 'digest' de GitHub: Deno publica además un .sha256sum
+        url_sum = activos[_DENO_ASSET + ".sha256sum"]["browser_download_url"]
+        with _req.urlopen(_req.Request(url_sum, headers={"User-Agent": "DeusMachinaTools"}), timeout=20) as r:
+            m = re.search(r"\b([0-9a-fA-F]{64})\b", r.read().decode("utf-8", "replace"))
+            sha = m.group(1).lower() if m else ""
+    if not sha:
+        raise RuntimeError("Deno no publicó la firma SHA-256 del zip; no se instala")
+    return {"version": str(datos.get("tag_name") or "").lstrip("vV"),
+            "url": zip_info["browser_download_url"],
+            "tamano": int(zip_info.get("size") or 0), "sha256": sha}
+
+
+def _deno_instalar(info):
+    """
+    Descarga el zip de Deno, comprueba tamaño y SHA-256, prueba el deno.exe
+    nuevo y solo entonces reemplaza al anterior (que se conserva si algo falla).
+    """
+    import urllib.request as _req, zipfile as _zip
+    carpeta = _deno_dir_propio()
+    os.makedirs(carpeta, exist_ok=True)
+    zip_path = os.path.join(carpeta, "_deno_descarga.zip")
+    nueva = os.path.join(carpeta, "_deno_nuevo")
+    exe = os.path.join(carpeta, "deno.exe")
+    viejo = os.path.join(carpeta, "deno_anterior.exe")
+    try:
+        peticion = _req.Request(info["url"], headers={"User-Agent": "DeusMachinaTools"})
+        with _req.urlopen(peticion, timeout=90) as resp, open(zip_path, "wb") as f:
+            shutil.copyfileobj(resp, f, 1 << 20)
+        if info.get("tamano") and os.path.getsize(zip_path) != info["tamano"]:
+            raise RuntimeError("la descarga de Deno quedó incompleta")
+        if _dmt_sha256_archivo(zip_path) != info["sha256"]:
+            raise RuntimeError("la firma SHA-256 del zip de Deno no coincide")
+
+        shutil.rmtree(nueva, ignore_errors=True)
+        with _zip.ZipFile(zip_path, "r") as z:
+            z.extract("deno.exe", nueva)
+        exe_nuevo = os.path.join(nueva, "deno.exe")
+        ver = _deno_version_de(exe_nuevo)
+        if not ver:
+            raise RuntimeError("el deno.exe descargado no arranca")
+
+        # Un .exe en uso no se puede borrar pero sí renombrar
+        if os.path.exists(viejo):
+            os.remove(viejo)
+        if os.path.exists(exe):
+            os.replace(exe, viejo)
+        try:
+            os.replace(exe_nuevo, exe)
+        except OSError:
+            if os.path.exists(viejo) and not os.path.exists(exe):
+                os.replace(viejo, exe)
+            raise
+        try:
+            os.remove(viejo)
+        except OSError:
+            pass                            # en uso: se borra la próxima vez
+
+        if carpeta not in os.environ.get("PATH", "").split(os.pathsep):
+            os.environ["PATH"] = carpeta + os.pathsep + os.environ.get("PATH", "")
+        print(f"✅ [DENO SETUP] Deno {ver} instalado en: {exe}")
+        return ver
+    finally:
+        shutil.rmtree(nueva, ignore_errors=True)
+        try:
+            if os.path.exists(zip_path):
+                os.remove(zip_path)
+        except OSError:
+            pass
+
+
+def _deno_actualizar_si_hace_falta():
+    """
+    Pone al día la copia de Deno que descargó la app (como el actualizador de
+    yt-dlp, pero solo y en segundo plano). Si no hay copia propia no hace nada:
+    se descarga la primera vez que el módulo de descargas la necesite.
+    Devuelve {"version", "actualizado"} o None si no hay copia propia.
+    """
+    carpeta = _deno_dir_propio()
+    exe = os.path.join(carpeta, "deno.exe")
+    try:
+        os.remove(os.path.join(carpeta, "deno_anterior.exe"))
+    except OSError:
+        pass
+    if not os.path.isfile(exe):
+        return None
+    with _DENO_DOWNLOAD_LOCK:
+        local = _deno_version_de(exe)
+        info = _deno_release_reciente()
+        if local and _dmt_version_tupla(local) >= _dmt_version_tupla(info["version"]):
+            return {"version": local, "actualizado": False}
+        ver = _deno_instalar(info)
+        print(f"[Deno] Actualizado {local or '?'} -> {ver}")
+        return {"version": ver, "actualizado": True}
 
 def _yt_opts_robustos():
     """
@@ -3196,6 +3607,7 @@ def _dmt_despachar_modulo_si_corresponde():
         os._exit(2)
     _dmt_stdio_para_subproceso()
     _dmt_subprocesos_sin_ventana()      # FFmpeg de spotDL sin ventanas negras que parpadean
+    _dmt_usar_certificados_del_sistema()
     sys.argv = [modulo] + sys.argv[3:]
     codigo = 0
     try:
@@ -3460,7 +3872,7 @@ def cargar_librerias_pesadas_global(progress_callback=None):
     """
     Carga librerías pesadas, configura GPU (ANTES de importar) y silencia logs visuales.
     """
-    global torch, faster_whisper, yt_dlp, wmi, comtypes, PyPDF2, fitz, cv2, np, WhisperModel
+    global torch, faster_whisper, yt_dlp, wmi, comtypes, pypdf, fitz, cv2, np, WhisperModel
 
     def _report(pct, msg):
         try:
@@ -3488,7 +3900,7 @@ def cargar_librerias_pesadas_global(progress_callback=None):
     # PyMuPDF se importa como 'pymupdf' (el nombre 'fitz' está obsoleto y avisa
     # en consola), pero se guarda en la variable global 'fitz' para no tocar el
     # resto del código.
-    tier1 = [('numpy', 'np'), ('cv2', 'cv2'), ('PyPDF2', 'PyPDF2'), ('pymupdf', 'fitz')]
+    tier1 = [('numpy', 'np'), ('cv2', 'cv2'), ('pypdf', 'pypdf'), ('pymupdf', 'fitz')]
 
     _report(15, "")
 
@@ -3948,9 +4360,8 @@ REMBG_U2NET_MD5 = "60024c5c889badc19c04ad937298a77b"      # el mismo que verific
 
 
 def _rembg_dir_modelos():
-    """%LOCALAPPDATA%/DeusMachinaTools/rembg_models (lo que se le pasa a rembg como U2NET_HOME)."""
-    _local = os.environ.get("LOCALAPPDATA", os.path.expanduser("~"))
-    return os.path.join(_local, "DeusMachinaTools", "rembg_models")
+    """%LOCALAPPDATA%/DEUS MACHINA/DeusMachinaTools/rembg_models (lo que se le pasa a rembg como U2NET_HOME)."""
+    return os.path.join(_dmt_base_dir(), "rembg_models")
 
 
 def _rembg_ruta_u2net(existente=True):
@@ -4139,7 +4550,7 @@ def _ocr_dir_paddle():
     """
     tools/paddleocr: cache de PaddleX y modelos descargados (official_models).
     Junto al programa si ya trae los modelos o si se puede escribir ahí; si no
-    (instalado en una carpeta protegida), en %LOCALAPPDATA%\\DeusMachinaTools.
+    (instalado en una carpeta protegida), en %LOCALAPPDATA%\\DEUS MACHINA\\DeusMachinaTools.
     """
     global _OCR_DIR_PADDLE
     if _OCR_DIR_PADDLE:
@@ -4391,7 +4802,7 @@ class GestorMotorOCR:
             texto = str(codigo)
         return RuntimeError(
             f"El motor OCR se cerró inesperadamente (código {texto}). "
-            f"Detalle en %LOCALAPPDATA%\\DeusMachinaTools\\logs\\motor_ocr.log")
+            f"Detalle en %LOCALAPPDATA%\\DEUS MACHINA\\DeusMachinaTools\\logs\\motor_ocr.log")
 
     def _esperar(self, timeout, on_espera=None):
         """Espera la respuesta del proceso reenviando sus mensajes de estado."""
@@ -4933,7 +5344,7 @@ def ffmpeg_capacidades(forzar=False):
     """
     Capacidades reales de la build de FFmpeg + GPU (con caché, segura entre hilos).
     La medición real (unos segundos de pruebas NVENC/NVDEC) se hace UNA sola vez
-    por equipo: el resultado queda guardado en %LOCALAPPDATA%\\DeusMachinaTools\\
+    por equipo: el resultado queda guardado en %LOCALAPPDATA%\\DEUS MACHINA\\DeusMachinaTools\\
     ffmpeg_caps.json y solo se repite si cambia FFmpeg, la GPU o el driver.
     """
     global _FF_CAPS
@@ -7876,18 +8287,14 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
     # --------------------------------------------------------------------------
     def get_config_path(self):
         """Genera la ruta segura en AppData/Local para guardar configs"""
-        # C:\Users\Usuario\AppData\Local\DeusMachinaTools
-        app_data = os.getenv('LOCALAPPDATA')
-        config_dir = os.path.join(app_data, "DeusMachinaTools")
-        
-        if not os.path.exists(config_dir):
-            try:
-                os.makedirs(config_dir)
-            except OSError:
-                # Fallback por si falla (ej. permisos raros), usar carpeta temporal
-                config_dir = os.path.join(_DMT_TEMP_BASE_SISTEMA, "DeusMachinaTools")
-                os.makedirs(config_dir, exist_ok=True)
-                
+        # C:\Users\Usuario\AppData\Local\DEUS MACHINA\DeusMachinaTools
+        config_dir = _dmt_base_dir()
+
+        if not os.path.isdir(config_dir):
+            # Fallback por si falla (ej. permisos raros), usar carpeta temporal
+            config_dir = os.path.join(_DMT_TEMP_BASE_SISTEMA, "DeusMachinaTools")
+            os.makedirs(config_dir, exist_ok=True)
+
         return os.path.join(config_dir, "config.json")
 
     _config_lock = threading.RLock()
@@ -8048,6 +8455,7 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
         self._salidas_recientes = {}    # barra -> última carpeta donde se guardó algo
         # --- VENTANAS UNICAS (se reutilizan: cerrar = ocultar) ---
         self.toplevel_about = None
+        self._upd_estado = {}           # actualizaciones: info del release, revisado, firma, Deno
         self.toplevel_licenses = None
         self.toplevel_docs = None
         self.toplevel_model_help = None
@@ -8171,6 +8579,9 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
 
         # --- LAZY FRAMES: pre-construir el resto de frames en background (2s de delay) ---
         self.after(1500, self._prebuild_frames_en_background)
+
+        # --- ACTUALIZACIONES: revisión en segundo plano (máx. 1 vez al día), sin estorbar el arranque ---
+        self.after(8000, self._upd_al_arrancar)
        
 
 
@@ -8984,8 +9395,9 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
 
         import warnings
         # 2. Configuración de la ventana (Tamaño reducido y compacto)
-        # Dimensiones reducidas (antes 480x600, ahora 420x550)
-        w, h = 360, 500 
+        # Dimensiones reducidas (antes 480x600, ahora 420x550); +105 de alto por la
+        # sección de actualizaciones
+        w, h = 360, 605
         about = self._ventana_nueva("Acerca de...  ℹ️", w, h,
                                     redimensionable=(False, False), reutilizable=True)
         self.toplevel_about = about  # <--- GUARDAR REFERENCIA AQUÍ
@@ -9095,6 +9507,21 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
         import platform as _platform
         ctk.CTkLabel(tech_row, text=f"Python {_platform.python_version()}", font=("Arial", 11, "bold"), text_color="#cccccc").pack(side="left", padx=5)
 
+        # --- ACTUALIZACIONES (estado, botón y firma del ejecutable) ---
+        self.lbl_upd_estado = ctk.CTkLabel(card_frame, text="", font=("Arial", 11), text_color="#888",
+                                           wraplength=280, justify="center")
+        self.lbl_upd_estado.pack(pady=(6, 0))
+        self.btn_upd = ctk.CTkButton(card_frame, text="Buscar actualizaciones", width=190, height=28,
+                                     fg_color="#222", hover_color="#333", border_width=1, border_color="#444",
+                                     text_color="#bbb", font=("Arial", 11, "bold"), command=self._upd_boton)
+        self.btn_upd.pack(pady=(4, 0))
+        self.lbl_upd_extra = ctk.CTkLabel(card_frame, text="", font=("Arial", 10), text_color="#666",
+                                          wraplength=280, justify="center")
+        self.lbl_upd_extra.pack(pady=(2, 0))
+        self._upd_refrescar_ui()
+        if "firma_propia" not in self._upd_estado:
+            threading.Thread(target=self._upd_firma_propia, daemon=True).start()
+
         # --- BOTÓN TÉRMINOS Y CONDICIONES (AGRANDADO) ---
         # ==============================================================================
         # --- NUEVO SISTEMA DE DOCUMENTACIÓN (3 PESTAÑAS) ---
@@ -9124,6 +9551,426 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
 
         if mostrar:
             self._ventana_mostrar(about)
+
+    # ==========================================================================
+    #   ACTUALIZACIONES DE LA APP (release de GitHub) Y DE DENO
+    # ==========================================================================
+    #   - Se revisa en segundo plano como máximo una vez al día (y con el botón
+    #     "Buscar actualizaciones" de Acerca de). Sin red, no hace nada.
+    #   - Si hay versión nueva: aviso en el botón Acerca de y UN diálogo por
+    #     versión ("Ahora no" / "Omitir esta versión").
+    #   - El instalador se descarga (reanudable), se comprueban tamaño, SHA-256
+    #     de GitHub, firma Authenticode con el certificado de la app y que sea
+    #     más nuevo; solo entonces se ejecuta (silencioso o normal).
+    def _upd_carpeta(self):
+        return os.path.join(_dmt_base_dir(), "actualizaciones")
+
+    def _upd_es_nueva(self, info):
+        return bool(info) and _dmt_version_tupla(info.get("version")) > _dmt_version_tupla(version)
+
+    def _upd_al_arrancar(self):
+        threading.Thread(target=self._upd_tarea_inicio, daemon=True).start()
+
+    def _upd_tarea_inicio(self):
+        cfg = self._config_leer()
+        if isinstance(cfg.get("upd_pendiente"), dict):
+            self._upd_terminar_pendiente(cfg["upd_pendiente"])
+        info = cfg.get("upd_info") if isinstance(cfg.get("upd_info"), dict) else None
+        self._upd_estado.update(info=info, revisado=float(cfg.get("upd_revisado") or 0),
+                                deno=cfg.get("deno_version"))
+        self._en_ui(self._upd_refrescar_ui)
+        if time.time() - self._upd_estado["revisado"] >= _DMT_UPDATE_INTERVALO:
+            self._upd_revisar(manual=False)
+
+    def _upd_terminar_pendiente(self, pendiente):
+        """Primer arranque tras instalar una actualización: borra el instalador y avisa una vez."""
+        if _dmt_version_tupla(version) < _dmt_version_tupla(pendiente.get("version")):
+            return      # no se llegó a instalar: el instalador se conserva para reintentar
+        shutil.rmtree(self._upd_carpeta(), ignore_errors=True)
+        self._config_guardar(upd_pendiente=None)
+        self._upd_firma_propia()
+        firma = self._upd_estado.get("firma_propia") or {}
+        if not _is_frozen_build():
+            texto_firma = ""
+        elif _dmt_firma_es_nuestra(firma):
+            texto_firma = f"\n\nFirma digital del programa verificada: {firma.get('nombre') or 'Kevin González'}."
+        else:
+            texto_firma = ("\n\n⚠️ La firma digital del programa instalado no es válida "
+                           f"({firma.get('estado', 'error')}). Reinstálalo desde la página oficial de GitHub.")
+        self._en_ui(self.after, 2500, lambda: messagebox.showinfo(
+            "Actualización completada",
+            f"DEUS MACHINA | TOOLS se actualizó a la versión {version}.{texto_firma}", parent=self))
+
+    def _upd_firma_propia(self):
+        """Firma del .exe que está corriendo (se muestra en Acerca de)."""
+        if not _is_frozen_build():
+            self._upd_estado["firma_propia"] = None
+        else:
+            try:
+                self._upd_estado["firma_propia"] = _dmt_firma_authenticode(sys.executable)
+            except Exception as e:
+                self._upd_estado["firma_propia"] = {"estado": "error", "huella": "", "nombre": str(e)}
+        self._en_ui(self._upd_refrescar_ui)
+
+    def _upd_revisar(self, manual=False):
+        """Hilo: consulta GitHub (app) y pone al día Deno. manual=True: botón de Acerca de."""
+        if getattr(self, "_upd_revisando", False):
+            return
+        self._upd_revisando = True
+        try:
+            if manual:
+                self._en_ui(self._upd_refrescar_ui, "Buscando actualizaciones...")
+            ok = False
+            try:
+                info = _dmt_release_app()
+                ahora = time.time()
+                self._upd_estado.update(info=info, revisado=ahora, error=None)
+                self._config_guardar(upd_info=info, upd_revisado=ahora)
+                ok = True
+            except Exception as e:
+                print(f"[Actualizaciones] No se pudo consultar GitHub: {e}")
+                self._upd_estado["error"] = True
+                info = None
+            try:
+                deno = _deno_actualizar_si_hace_falta()
+                if deno:
+                    self._upd_estado["deno"] = deno["version"]
+                    self._config_guardar(deno_version=deno["version"])
+            except Exception as e:
+                print(f"[Deno] No se pudo revisar o actualizar: {e}")
+            self._en_ui(self._upd_refrescar_ui)
+
+            if ok and self._upd_es_nueva(info):
+                cfg = self._config_leer()
+                if manual or (cfg.get("upd_omitir") != info["version"]
+                              and cfg.get("upd_aviso_mostrado") != info["version"]):
+                    self._config_guardar(upd_aviso_mostrado=info["version"])
+                    self._en_ui(self._upd_ofrecer, info)
+            elif ok and not getattr(self, "_upd_descargando", False):
+                # Al día: no hace falta guardar instaladores a medias de versiones viejas
+                shutil.rmtree(self._upd_carpeta(), ignore_errors=True)
+        finally:
+            self._upd_revisando = False
+
+    def _upd_boton(self):
+        info = self._upd_estado.get("info")
+        if self._upd_es_nueva(info):
+            self._upd_ofrecer(info)
+        else:
+            threading.Thread(target=self._upd_revisar, kwargs={"manual": True}, daemon=True).start()
+
+    def _upd_refrescar_ui(self, texto=None):
+        """Botón Acerca de (aviso discreto) y sección de actualizaciones de la ventana Acerca de."""
+        est = self._upd_estado
+        info = est.get("info")
+        nueva = self._upd_es_nueva(info)
+        omitida = nueva and self._config_leer().get("upd_omitir") == info.get("version")
+        try:
+            if nueva and not omitida:
+                self.btn_about.configure(text="⬆ Acerca de...", text_color="#2cc985", border_color="#2cc985")
+            else:
+                self.btn_about.configure(text="ⓘ Acerca de...", text_color="#ccc", border_color="#444")
+        except Exception:
+            pass
+
+        lbl = getattr(self, "lbl_upd_estado", None)
+        if lbl is None:
+            return
+        color = "#888"
+        if texto:
+            pass
+        elif nueva:
+            texto = f"⬆️ Nueva versión {info['version']} disponible" + (" (omitida)" if omitida else "")
+            color = "#2cc985"
+        elif est.get("revisado"):
+            cuando = datetime.datetime.fromtimestamp(est["revisado"])
+            dia = "hoy" if cuando.date() == datetime.date.today() else cuando.strftime("%d/%m/%Y")
+            texto = f"✅ Estás al día · revisado {dia} {cuando.strftime('%H:%M')}"
+            if est.get("error"):
+                texto += "\n(la última búsqueda no pudo conectar con GitHub)"
+        elif est.get("error"):
+            texto = "No se pudo conectar con GitHub para buscar actualizaciones."
+        else:
+            texto = "Las actualizaciones se buscan solas una vez al día."
+        try:
+            lbl.configure(text=texto, text_color=color)
+            self.btn_upd.configure(text="Descargar e instalar..." if nueva else "Buscar actualizaciones",
+                                   state="disabled" if self._upd_revisando_o_descargando() else "normal")
+        except Exception:
+            return
+
+        partes = []
+        firma = est.get("firma_propia", "pendiente")
+        if firma == "pendiente":
+            pass
+        elif firma is None:
+            partes.append("Ejecución desde el código (.py): sin firma")
+        elif _dmt_firma_es_nuestra(firma):
+            partes.append(f"Ejecutable firmado ✓ {firma.get('nombre') or ''}".strip())
+        else:
+            partes.append(f"⚠️ Firma del ejecutable: {firma.get('estado', 'error')}")
+        if est.get("deno"):
+            partes.append(f"Deno {est['deno']}")
+        try:
+            self.lbl_upd_extra.configure(text=" · ".join(partes))
+        except Exception:
+            pass
+
+    def _upd_revisando_o_descargando(self):
+        return bool(getattr(self, "_upd_revisando", False) or getattr(self, "_upd_descargando", False))
+
+    def _upd_ofrecer(self, info):
+        """Diálogo: versión nueva, modo de instalación y descarga verificada."""
+        win = getattr(self, "_upd_ventana", None)
+        try:
+            if win is not None and win.winfo_exists():
+                self._ventana_mostrar(win)
+                return
+        except Exception:
+            pass
+        import webbrowser
+        win = self._ventana_nueva("Actualización disponible", 480, 335, fg_color="#181818",
+                                  redimensionable=(False, False))
+        self._upd_ventana = win
+        ctl = {"cancelar": threading.Event()}
+
+        ctk.CTkLabel(win, text=f"Nueva versión {info['version']}", font=(self.main_font, 20, "bold"),
+                     text_color="#2cc985").pack(pady=(18, 2))
+        tam = f" · descarga de {info['tamano'] / 1048576:,.0f} MB" if info.get("tamano") else ""
+        ctk.CTkLabel(win, text=f"Tienes la versión {version}{tam}.", font=("Arial", 12),
+                     text_color="#bbb").pack()
+        ctk.CTkButton(win, text="Ver las novedades en GitHub", width=200, height=26, fg_color="transparent",
+                      hover_color="#222", text_color="#5dade2", font=("Arial", 11, "underline"),
+                      command=lambda: webbrowser.open(info.get("pagina") or
+                                                      f"https://github.com/{_DMT_REPO_GITHUB}/releases")
+                      ).pack(pady=(2, 8))
+
+        modo = ctk.StringVar(value=self._config_leer().get("upd_modo") or "silenciosa")
+        caja = ctk.CTkFrame(win, fg_color="#202020", corner_radius=8)
+        caja.pack(fill="x", padx=24)
+        radios = [
+            ctk.CTkRadioButton(caja, text="Silenciosa: sin preguntas; solo se ve el avance\n"
+                                          "y la app se vuelve a abrir sola al terminar",
+                               variable=modo, value="silenciosa", font=("Arial", 11)),
+            ctk.CTkRadioButton(caja, text="Normal: el asistente del instalador de siempre",
+                               variable=modo, value="normal", font=("Arial", 11)),
+        ]
+        radios[0].pack(anchor="w", padx=12, pady=(10, 4))
+        radios[1].pack(anchor="w", padx=12, pady=(4, 10))
+
+        ctk.CTkLabel(win, text="Antes de instalar se comprueban la huella SHA-256 que publica GitHub\n"
+                               "y la firma digital del instalador (la misma que la de este programa).",
+                     font=("Arial", 10), text_color="#777").pack(pady=(8, 4))
+        ctl["barra"] = ctk.CTkProgressBar(win, width=400, progress_color="#2cc985")
+        ctl["barra"].set(0)
+        ctl["lbl"] = ctk.CTkLabel(win, text="", font=("Arial", 11), text_color="#aaa", wraplength=420)
+        ctl["lbl"].pack(pady=(2, 4))
+
+        botones = ctk.CTkFrame(win, fg_color="transparent")
+        botones.pack(pady=(4, 12))
+        estilo = {"height": 32, "font": ("Arial", 12, "bold"), "border_width": 1, "border_color": "#333"}
+        btn_si = ctk.CTkButton(botones, text="Descargar e instalar", width=170, fg_color="#1e7a46",
+                               hover_color="#25945a", **estilo)
+        btn_no = ctk.CTkButton(botones, text="Ahora no", width=110, fg_color="#2b2b2b",
+                               hover_color="#333", **estilo)
+        btn_omitir = ctk.CTkButton(botones, text="Omitir esta versión", width=140, fg_color="#2b2b2b",
+                                   hover_color="#333", **estilo)
+        for b in (btn_si, btn_no, btn_omitir):
+            b.pack(side="left", padx=4)
+
+        def _cerrar():
+            ctl["cancelar"].set()
+            self._upd_ventana = None
+            try:
+                win.destroy()
+            except Exception:
+                pass
+
+        def _omitir():
+            self._config_guardar(upd_omitir=info["version"])
+            self._upd_refrescar_ui()
+            _cerrar()
+
+        def _modo_espera(descargando):
+            estado = "disabled" if descargando else "normal"
+            for w in radios + [btn_si, btn_omitir]:
+                w.configure(state=estado)
+            btn_no.configure(text="Cancelar" if descargando else "Ahora no")
+
+        def _empezar():
+            if getattr(self, "_upd_descargando", False):
+                return
+            self._config_guardar(upd_modo=modo.get())
+            ctl["cancelar"].clear()
+            ctl["barra"].pack(before=ctl["lbl"], pady=(4, 0))
+            _modo_espera(True)
+            threading.Thread(target=self._upd_descargar, args=(info, modo.get(), ctl), daemon=True).start()
+
+        def _fin_error():
+            _modo_espera(False)
+            btn_si.configure(text="Reintentar")
+
+        ctl["fin_error"] = _fin_error
+        ctl["cerrar"] = _cerrar
+        btn_si.configure(command=_empezar)
+        btn_no.configure(command=_cerrar)
+        btn_omitir.configure(command=_omitir)
+        win.protocol("WM_DELETE_WINDOW", _cerrar)
+        self._ventana_mostrar(win)
+
+    def _upd_descargar(self, info, modo, ctl):
+        """Hilo: descarga (reanudable) y verificación del instalador. No ejecuta nada si algo falla."""
+        import urllib.request as _req
+
+        def _si_existe(widget, fn, *args, **kwargs):
+            # El diálogo puede cerrarse mientras el hilo sigue (la descarga queda en pausa)
+            try:
+                if widget.winfo_exists():
+                    fn(*args, **kwargs)
+            except Exception:
+                pass
+
+        def estado(texto, color="#aaa"):
+            self._en_ui(_si_existe, ctl["lbl"], ctl["lbl"].configure, text=texto, text_color=color)
+
+        def avance(fraccion):
+            self._en_ui(_si_existe, ctl["barra"], ctl["barra"].set, max(0.0, min(1.0, fraccion)))
+
+        def mb(n):
+            return f"{n / 1048576:,.0f}"
+
+        carpeta = self._upd_carpeta()
+        final = os.path.join(carpeta, info["nombre"])
+        parcial = final + ".part"
+        total = int(info.get("tamano") or 0)
+        self._upd_descargando = True
+        self._trabajo_inicio("actualizacion", "Descarga de la actualización")
+        self._en_ui(self._upd_refrescar_ui)
+        try:
+            os.makedirs(carpeta, exist_ok=True)
+            for nombre in os.listdir(carpeta):          # restos de otras versiones
+                if nombre not in (info["nombre"], info["nombre"] + ".part"):
+                    try:
+                        os.remove(os.path.join(carpeta, nombre))
+                    except OSError:
+                        pass
+
+            if not (os.path.isfile(final) and (not total or os.path.getsize(final) == total)):
+                hecho = os.path.getsize(parcial) if os.path.isfile(parcial) else 0
+                if total and hecho > total:
+                    hecho = 0
+                if not total or hecho < total:
+                    peticion = _req.Request(info["url"], headers={"User-Agent": f"DeusMachinaTools/{version}"})
+                    if hecho:
+                        peticion.add_header("Range", f"bytes={hecho}-")
+                    estado("Conectando con GitHub...")
+                    with _req.urlopen(peticion, timeout=30) as resp:
+                        if hecho and getattr(resp, "status", 200) != 206:
+                            hecho = 0                    # el servidor no reanuda: desde cero
+                        with open(parcial, "ab" if hecho else "wb") as f:
+                            t0, inicio, ultimo = time.monotonic(), hecho, 0.0
+                            while True:
+                                if ctl["cancelar"].is_set():
+                                    print("[Actualizaciones] Descarga en pausa; se reanuda donde quedó.")
+                                    return
+                                bloque = resp.read(1 << 20)
+                                if not bloque:
+                                    break
+                                f.write(bloque)
+                                hecho += len(bloque)
+                                ahora = time.monotonic()
+                                if ahora - ultimo > 0.25:
+                                    ultimo = ahora
+                                    vel = (hecho - inicio) / max(ahora - t0, 0.001) / 1048576
+                                    if total:
+                                        avance(hecho / total)
+                                    estado(f"Descargando {mb(hecho)} de {mb(total)} MB · {vel:.1f} MB/s")
+                if total and os.path.getsize(parcial) != total:
+                    raise RuntimeError("La descarga quedó incompleta. Pulsa Reintentar: sigue donde quedó.")
+                os.replace(parcial, final)
+
+            def _rechazar(motivo):
+                try:
+                    os.remove(final)
+                except OSError:
+                    pass
+                raise RuntimeError(f"{motivo} Se borró la descarga y no se instaló nada.")
+
+            if info.get("sha256"):
+                estado("Verificando la huella SHA-256...", "yellow")
+                avance(0)
+                if _dmt_sha256_archivo(final, (lambda n: avance(n / total)) if total else None) != info["sha256"]:
+                    _rechazar("La huella SHA-256 no coincide con la que publica GitHub.")
+
+            estado("Verificando la firma digital...", "yellow")
+            firma = _dmt_firma_authenticode(final)
+            confiables = set(_DMT_FIRMAS_CONFIABLES)
+            propia = self._upd_estado.get("firma_propia")
+            if isinstance(propia, dict) and propia.get("estado") in ("valida", "raiz_no_confiable") and propia.get("huella"):
+                confiables.add(propia["huella"].upper())
+            if firma.get("estado") not in ("valida", "raiz_no_confiable") or firma.get("huella") not in confiables:
+                _rechazar(f"El instalador no tiene la firma digital de la app ({firma.get('estado')}).")
+            if _dmt_version_tupla(_dmt_version_archivo(final)) <= _dmt_version_tupla(version):
+                _rechazar("El instalador no es más nuevo que la versión instalada.")
+
+            avance(1)
+            estado(f"✅ Verificado: firmado por {firma.get('nombre') or 'Kevin González'}.", "#2cc985")
+            self._en_ui(self._upd_instalar, final, modo, info, ctl)
+        except Exception as e:
+            print(f"[Actualizaciones] {e}")
+            estado(f"❌ {e}", "#ff6b6b")
+            self._en_ui(_si_existe, ctl["lbl"], ctl["fin_error"])
+        finally:
+            self._upd_descargando = False
+            self._trabajo_fin("actualizacion")
+            self._en_ui(self._upd_refrescar_ui)
+
+    def _upd_instalar(self, instalador, modo, info, ctl):
+        """Hilo de la interfaz: confirma si hay trabajos en curso y lanza el instalador."""
+        activos = self._trabajos_en_curso()
+        if activos:
+            lista = "\n".join(f"• {a}" for a in activos)
+            if not messagebox.askyesno(
+                    "Instalar actualización",
+                    f"Para instalar se cerrará la app y se cancelará:\n\n{lista}\n\n¿Instalar ahora?",
+                    icon="warning", default="no", parent=self._upd_ventana or self):
+                ctl["fin_error"]()
+                ctl["lbl"].configure(text="Listo para instalar cuando quieras (ya está verificado).")
+                return
+        if modo == "silenciosa":
+            parametros = "/SILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS /RELANZAR=1"
+        else:
+            parametros = ""
+        ctl["lbl"].configure(text="Esperando el permiso de administrador de Windows...", text_color="yellow")
+        threading.Thread(target=self._upd_lanzar, args=(instalador, parametros, info, ctl), daemon=True).start()
+
+    def _upd_lanzar(self, instalador, parametros, info, ctl):
+        """Hilo: ShellExecute (pide UAC). Si arranca, la app se cierra para que se pueda instalar."""
+        from ctypes import wintypes
+        shell32 = ctypes.WinDLL("shell32")
+        shell32.ShellExecuteW.argtypes = [wintypes.HWND, wintypes.LPCWSTR, wintypes.LPCWSTR,
+                                          wintypes.LPCWSTR, wintypes.LPCWSTR, ctypes.c_int]
+        shell32.ShellExecuteW.restype = ctypes.c_void_p
+        r = shell32.ShellExecuteW(None, "open", instalador, parametros or None,
+                                  os.path.dirname(instalador), 1) or 0
+        if r <= 32:
+            if r == 5:          # SE_ERR_ACCESSDENIED: se canceló el UAC
+                texto = "Cancelaste el permiso de administrador: no se instaló nada."
+            else:
+                texto = f"No se pudo abrir el instalador (código {r})."
+
+            def _avisar():
+                try:
+                    if ctl["lbl"].winfo_exists():
+                        ctl["fin_error"]()
+                        ctl["lbl"].configure(text=texto, text_color="#ff6b6b")
+                except Exception:
+                    pass
+            self._en_ui(_avisar)
+            return
+        self._config_guardar(upd_pendiente={"version": info["version"], "archivo": instalador})
+        print(f"[Actualizaciones] Instalador {info['version']} lanzado ({parametros or 'normal'}); cerrando la app.")
+        self._en_ui(self.on_closing, True)
 
     def open_docs_window(self, mostrar=True):
         """Documentación y Legal (Léeme / Licencia AGPL / Third Party / Términos)."""
@@ -12226,8 +13073,7 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
                     os.environ["PATH"] = meipass + os.pathsep + os.environ.get("PATH", "")
 
             # U2NET_HOME → ruta escribible y persistente en CUALQUIER PC
-            _local = os.environ.get("LOCALAPPDATA", os.path.expanduser("~"))
-            _models_dir = os.path.join(_local, "DeusMachinaTools", "rembg_models")
+            _models_dir = _rembg_dir_modelos()
             os.makedirs(_models_dir, exist_ok=True)
             os.environ["U2NET_HOME"] = _models_dir
 
@@ -13439,8 +14285,8 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
             estado("Verificando rangos...", "yellow")
             self._en_ui(self.split_progress.set, 0)
 
-            reader = PyPDF2.PdfReader(pdf_file)
-            writer = PyPDF2.PdfWriter()
+            reader = pypdf.PdfReader(pdf_file)
+            writer = pypdf.PdfWriter()
             total_pages = len(reader.pages)
 
             # 1. Interpretar lo que escribió el usuario (con candados de rango)
@@ -14962,8 +15808,9 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
         activos.extend(list(self._trabajos.values()))
         return activos
 
-    def on_closing(self):
-        activos = self._trabajos_en_curso()
+    def on_closing(self, forzar=False):
+        """forzar=True: sin preguntar (lo usa el actualizador, que ya lo confirmó)."""
+        activos = [] if forzar else self._trabajos_en_curso()
         if activos:
             lista = "\n".join(f"• {a}" for a in activos)
             if not messagebox.askyesno(
@@ -21656,8 +22503,7 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
 
                 # Usar AppData/Local para que la escritura siempre funcione
                 # desde el .exe sin necesitar permisos de administrador.
-                _la      = os.environ.get("LOCALAPPDATA") or os.path.join(os.path.expanduser("~"), "AppData", "Local")
-                pkg_dir  = os.path.join(_la, "DeusMachinaTools", "yt_dlp_live")
+                pkg_dir  = _ytdlp_live_dir()
                 os.makedirs(pkg_dir, exist_ok=True)
                 tmp_whl  = os.path.join(pkg_dir, "_yt_dlp_new.whl")
 
@@ -24252,11 +25098,21 @@ if __name__ == "__main__":
     # ejecuta aquí y el proceso termina sin abrir la interfaz.
     _dmt_despachar_modulo_si_corresponde()
 
+    # Datos de la v3.0 (%LOCALAPPDATA%\DeusMachinaTools) → DEUS MACHINA\DeusMachinaTools,
+    # antes de abrir el log de la sesión (que vive en esa carpeta)
+    _msg_migracion = _dmt_migrar_datos_viejos()
+
     # Registro para builds sin consola y carpeta temporal propia de esta sesión
     _dmt_preparar_stdio_app()
     _dmt_activar_faulthandler()
     _dmt_iniciar_temporales()
     print(f"[DMT] Python {sys.version.split()[0]} | compilado={_is_frozen_build()} | {sys.executable}")
+    if _msg_migracion:
+        print(_msg_migracion)
+
+    # Certificados de Windows para HTTPS: en un hilo, para no retrasar la ventana
+    # (tarda unas décimas y la primera conexión de la app llega varios segundos después)
+    threading.Thread(target=_dmt_usar_certificados_del_sistema, daemon=True).start()
 
     try:
         import ctypes

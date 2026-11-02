@@ -1,5 +1,184 @@
 # CHANGELOG — Deus Machina Tools
 
+# —— Novedades v3.1 ——
+
+---
+---
+
+# 🇲🇽 ESPAÑOL
+
+---
+
+## 📋 Resumen para el usuario
+
+La 3.1 es una versión de **seguridad y mantenimiento**. En octubre de 2026 se publicaron fallas graves en piezas que la app trae por dentro (la de **brotli** conocida como "Node2Shell", la autoridad de certificados **eMudhra** comprometida, **Pillow**, **Ghostscript**…): todas quedan corregidas al actualizar esas librerías y herramientas.
+
+Además, la app ahora **busca actualizaciones sola** (una vez al día como máximo, sin estorbar) y puede **descargar e instalar la versión nueva** —en modo silencioso o con el asistente normal— comprobando antes que el instalador sea auténtico. **Deno** (el motor que yt-dlp usa con YouTube) también **se mantiene al día solo**, y los datos de la app se guardan ahora en `%LOCALAPPDATA%\DEUS MACHINA\DeusMachinaTools` (se mueven solos la primera vez; no se pierde nada).
+
+---
+
+## 🔒 Seguridad
+
+- **brotli 1.2.0 → 1.2.1** y **curl_cffi 0.15.0 → 0.17.0** (que trae su propia copia de brotli): corrigen **CVE-2026-111497** ("Node2Shell" / "Broccoli2Shell"), un desbordamiento al descomprimir respuestas de un servidor. Es la misma falla que se hizo famosa en Node.js; la app no usa PHP ni Node.js, pero sí brotli al descargar.
+- **certifi 2026.10.23:** deja de confiar en los certificados de **eMudhra**, cuyas claves se filtraron (con ellas se podían falsificar conexiones HTTPS).
+- **Certificados de Windows en las conexiones HTTPS (truststore):** la app ahora valida con el almacén de certificados de Windows. Así las descargas funcionan también en equipos con un antivirus que inspecciona HTTPS (como Avast) o con proxy de empresa, y se respetan los bloqueos que publica Microsoft (también bloqueó a eMudhra por Windows Update). Un certificado vencido, falso o de otro sitio se sigue rechazando.
+- **Pillow 12.3.0 → 13.0.0** (con **rembg 2.0.86**, la primera que la acepta): corrige 12 fallas, una crítica (abrir una imagen FlashPix manipulada podía ejecutar código).
+- **Ghostscript 10.06.0 → 10.08.0:** corrige **CVE-2026-39919** (un PDF manipulado podía ejecutar código al comprimirlo).
+- **FFmpeg 9.0.1 → 9.0.2** y **Deno 2.9.8** (también deja de confiar en eMudhra).
+- **PyPDF2 → pypdf 6.21.4:** PyPDF2 está abandonada y nunca corrigió **CVE-2023-36464** (un PDF malformado la dejaba en un bucle infinito al dividirlo). pypdf es su continuación oficial y ya lo corrige, junto con las fallas publicadas hasta el 30 de octubre.
+- **spotDL 4.5.2 → 4.6.0:** arrastra fastapi 0.162, starlette 1.10 y anyio 4.15; las versiones anteriores tenían fallas altas y una crítica.
+- Parches en **aiohttp 3.14.5**, **cryptography 50.0.2**, **dnspython 2.9.1**, **multidict 6.9.1**, **pymongo 4.18.3**, **setuptools 84.2.1** y **yt-dlp 2026.10.26**.
+- **Python 3.13.17** (parches de seguridad de Python). Se sigue en Python 3.13 porque PaddlePaddle aún no publica versión para Python 3.14 en Windows (sin ella se perderían los dos motores PaddleOCR).
+
+---
+
+## 🚀 Nuevas Funciones
+
+### 1.- Buscador de actualizaciones
+
+- Revisa GitHub **en segundo plano y como máximo una vez al día**. Sin internet, no hace nada.
+- En **Acerca de…** aparece el estado ("Estás al día · revisado hoy 10:32" o "Nueva versión disponible"), un botón **Buscar actualizaciones**, la **firma digital del ejecutable** y la versión de Deno.
+- Si hay versión nueva, el botón de la barra cambia a **⬆ Acerca de…** y aparece **un solo aviso por versión**, con **Ahora no** y **Omitir esta versión**.
+- Eliges la instalación **silenciosa** (sin preguntas; solo se ve el avance y la app se vuelve a abrir sola) o la **normal** (el asistente de siempre).
+- La descarga (~1.6 GB) muestra su avance y **se reanuda donde quedó** si se corta o la pausas.
+- **Antes de instalar se comprueba todo:** el tamaño y la huella **SHA-256** que publica GitHub, la **firma digital** del instalador (tiene que ser la misma que la del programa que tienes) y que de verdad sea una versión más nueva. Si algo no coincide, se borra la descarga y no se instala nada.
+- Al abrir la versión nueva, un aviso confirma la actualización y que la firma del programa instalado es válida.
+
+### 2.- Deno se mantiene al día solo
+
+Igual que se descarga la primera vez que hace falta, ahora **se actualiza solo** en la misma revisión diaria, con la huella SHA-256 de GitHub verificada y probando el ejecutable nuevo antes de reemplazar el anterior (si algo falla, se queda el que funcionaba).
+
+### 3.- Instalador con modo silencioso
+
+El instalador acepta `/SILENT` y `/VERYSILENT`. Al actualizar encima, cierra la app si está abierta y quita el build anterior antes de copiar el nuevo, para que no se mezclen archivos de dos versiones.
+
+---
+
+## 🛠️ Mejoras
+
+### 1.- Carpeta de datos nueva
+
+La configuración, los registros, la copia actualizada de yt-dlp, los modelos de "Quitar fondo" y Deno pasan de `%LOCALAPPDATA%\DeusMachinaTools` a **`%LOCALAPPDATA%\DEUS MACHINA\DeusMachinaTools`**. La primera vez se mueve todo de golpe (es instantáneo). Si existieran las dos carpetas, se combinan sin pisar nada y lo repetido se guarda aparte en `_carpeta_vieja_<fecha>`. Lo que ya hubiera en `DEUS MACHINA` (otras apps) no se toca, y el desinstalador nunca borra esa carpeta. Los temporales siguen en `%TEMP%\DeusMachinaTools`.
+
+### 2.- Compilación en un paso
+
+- **`compilar_dmt.bat`:** crea el entorno virtual si falta, regenera las licencias de terceros, compila y deja la carpeta del instalador lista con `tools` y los documentos; también actualiza la copia del repositorio.
+- **La versión se escribe una sola vez** (en el código); los metadatos del `.exe` y el instalador de Inno Setup la toman de ahí.
+- **`crear_venv_dmt.bat`** usa Python 3.13, se instala junto a sí mismo, rehace el entorno si está roto y fija **todas** las versiones (`requirements.txt`).
+
+### 3.- Descarga y soporte en GitHub
+
+El instalador ahora se publica solo en **GitHub Releases** (ya no hay espejo en Google Drive). El soporte y las consultas pasan a **GitHub Issues**, en lugar de correo, y el código fuente se obtiene del repositorio público.
+
+---
+
+## 🐛 Correcciones de Errores
+
+### 1.- Versión del .exe ilegible
+
+Los metadatos del ejecutable declaraban una tabla de idioma que no existía, así que Windows (y Inno Setup) no podían leer su "Versión del producto". Ahora coinciden.
+
+---
+
+## ⚙️ Cambios Internos
+
+- **Una sola ruta de datos:** `_dmt_base_dir()` (config, logs, `yt_dlp_live`, `rembg_models`, `tools\deno`, `ffmpeg_caps.json`…) y `_dmt_migrar_datos_viejos()`, que corre antes de abrir el log de la sesión.
+- **Actualizaciones:** `_dmt_release_app()`, `_dmt_firma_authenticode()` (WinVerifyTrust por ctypes, sin PowerShell; huella del certificado fijada), `_deno_actualizar_si_hace_falta()` y los métodos `App._upd_*`. `on_closing(forzar=True)` cierra sin preguntar cuando lo pide el actualizador.
+- **Certificados:** `_dmt_usar_certificados_del_sistema()` activa `truststore` (en un hilo al arrancar la app; directo en el proceso de spotDL y en el del motor OCR). curl_cffi tiene su propio motor TLS: `_dmt_certificados_para_curl()` le da certifi más las raíces locales de Windows para servidores, sin las del programa público de Microsoft. Si algo falla, se sigue con certifi.
+- **`build_pyinstaller.py`** genera `version_info.txt` a partir de `version = "…"` y avisa si README o CHANGELOG no mencionan la versión (`--version` solo la imprime).
+- **`innoF.iss`** lee la versión del `.exe` (`GetFileProductVersionString`), usa rutas relativas, `[InstallDelete]` del build anterior y `/RELANZAR=1` para reabrir la app como el usuario normal.
+- **Dependencias:** `soundcloud-v2` se fija en 1.6.2 (la 1.7.0 exige curl_cffi < 0.16, la versión vulnerable).
+
+---
+---
+
+# 🇺🇸 ENGLISH
+
+---
+
+## 📋 User Summary
+
+3.1 is a **security and maintenance** release. In October 2026 serious flaws were published in pieces the app ships inside (the **brotli** one known as "Node2Shell", the compromised **eMudhra** certificate authority, **Pillow**, **Ghostscript**…): all of them are fixed by updating those libraries and tools.
+
+The app now also **checks for updates by itself** (at most once a day, without getting in the way) and can **download and install the new version** — silently or with the normal wizard — after checking that the installer is authentic. **Deno** (the engine yt-dlp uses for YouTube) **keeps itself up to date** too, and the app's data now lives in `%LOCALAPPDATA%\DEUS MACHINA\DeusMachinaTools` (moved automatically the first time; nothing is lost).
+
+---
+
+## 🔒 Security
+
+- **brotli 1.2.0 → 1.2.1** and **curl_cffi 0.15.0 → 0.17.0** (which bundles its own brotli): fix **CVE-2026-111497** ("Node2Shell" / "Broccoli2Shell"), an overflow when decompressing server responses. It is the same flaw that became famous in Node.js; the app does not use PHP or Node.js, but it does use brotli when downloading.
+- **certifi 2026.10.23:** stops trusting **eMudhra** certificates, whose keys leaked (they could be used to forge HTTPS connections).
+- **Windows certificates for HTTPS connections (truststore):** the app now validates against the Windows certificate store. Downloads therefore also work on machines with an antivirus that inspects HTTPS (such as Avast) or behind a corporate proxy, and the blocks Microsoft publishes are honored (it also blocked eMudhra through Windows Update). An expired, forged or wrong-site certificate is still rejected.
+- **Pillow 12.3.0 → 13.0.0** (with **rembg 2.0.86**, the first release that accepts it): fixes 12 flaws, one critical (opening a crafted FlashPix image could run code).
+- **Ghostscript 10.06.0 → 10.08.0:** fixes **CVE-2026-39919** (a crafted PDF could run code while being compressed).
+- **FFmpeg 9.0.1 → 9.0.2** and **Deno 2.9.8** (also stops trusting eMudhra).
+- **PyPDF2 → pypdf 6.21.4:** PyPDF2 is abandoned and never fixed **CVE-2023-36464** (a malformed PDF sent it into an infinite loop when splitting). pypdf is its official successor and fixes it, along with the flaws published up to October 30.
+- **spotDL 4.5.2 → 4.6.0:** brings fastapi 0.162, starlette 1.10 and anyio 4.15; the previous versions had high-severity flaws and a critical one.
+- Patches in **aiohttp 3.14.5**, **cryptography 50.0.2**, **dnspython 2.9.1**, **multidict 6.9.1**, **pymongo 4.18.3**, **setuptools 84.2.1** and **yt-dlp 2026.10.26**.
+- **Python 3.13.17** (Python security fixes). The app stays on Python 3.13 because PaddlePaddle does not publish a Python 3.14 build for Windows yet (without it both PaddleOCR engines would be lost).
+
+---
+
+## 🚀 New Features
+
+### 1.- Update checker
+
+- Checks GitHub **in the background, at most once a day**. Without internet, it does nothing.
+- **About…** shows the status ("You're up to date · checked today 10:32" or "New version available"), a **Check for updates** button, the **digital signature of the executable** and the Deno version.
+- When a new version exists, the top-bar button changes to **⬆ Acerca de…** and **a single notice per version** appears, with **Not now** and **Skip this version**.
+- You choose a **silent** install (no questions; only the progress is shown and the app reopens by itself) or the **normal** one (the usual wizard).
+- The download (~1.6 GB) shows its progress and **resumes where it stopped** if it is interrupted or paused.
+- **Everything is checked before installing:** the size and the **SHA-256** hash published by GitHub, the installer's **digital signature** (it must be the same one as the program you have) and that it really is a newer version. If anything does not match, the download is deleted and nothing is installed.
+- When the new version opens, a notice confirms the update and that the installed program's signature is valid.
+
+### 2.- Deno keeps itself up to date
+
+Just as it is downloaded the first time it is needed, it now **updates itself** during the same daily check, with GitHub's SHA-256 hash verified and the new executable tested before it replaces the old one (if anything fails, the working one stays).
+
+### 3.- Installer with silent mode
+
+The installer accepts `/SILENT` and `/VERYSILENT`. When updating over an existing install, it closes the app if it is open and removes the previous build before copying the new one, so files from two versions never mix.
+
+---
+
+## 🛠️ Improvements
+
+### 1.- New data folder
+
+Settings, logs, the updated copy of yt-dlp, the "Remove background" models and Deno move from `%LOCALAPPDATA%\DeusMachinaTools` to **`%LOCALAPPDATA%\DEUS MACHINA\DeusMachinaTools`**. The first time everything is moved at once (it is instant). If both folders existed, they are merged without overwriting anything, and duplicates are kept aside in `_carpeta_vieja_<date>`. Anything already in `DEUS MACHINA` (other apps) is left untouched, and the uninstaller never deletes that folder. Temporary files stay in `%TEMP%\DeusMachinaTools`.
+
+### 2.- One-step build
+
+- **`compilar_dmt.bat`:** creates the virtual environment if missing, regenerates the third-party licenses, builds, and leaves the installer folder ready with `tools` and the documents; it also updates the repository copy.
+- **The version is written only once** (in the code); the `.exe` metadata and the Inno Setup installer take it from there.
+- **`crear_venv_dmt.bat`** uses Python 3.13, installs next to itself, rebuilds the environment if it is broken and pins **every** version (`requirements.txt`).
+
+### 3.- Downloads and support on GitHub
+
+The installer is now published only on **GitHub Releases** (the Google Drive mirror is gone). Support and inquiries move to **GitHub Issues** instead of email, and the source code comes from the public repository.
+
+---
+
+## 🐛 Bug Fixes
+
+### 1.- Unreadable .exe version
+
+The executable's metadata declared a language table that did not exist, so Windows (and Inno Setup) could not read its "Product version". They now match.
+
+---
+
+## ⚙️ Internal Changes
+
+- **A single data path:** `_dmt_base_dir()` (config, logs, `yt_dlp_live`, `rembg_models`, `tools\deno`, `ffmpeg_caps.json`…) and `_dmt_migrar_datos_viejos()`, which runs before the session log is opened.
+- **Updates:** `_dmt_release_app()`, `_dmt_firma_authenticode()` (WinVerifyTrust through ctypes, no PowerShell; pinned certificate thumbprint), `_deno_actualizar_si_hace_falta()` and the `App._upd_*` methods. `on_closing(forzar=True)` closes without asking when the updater requests it.
+- **Certificates:** `_dmt_usar_certificados_del_sistema()` enables `truststore` (in a thread when the app starts; directly in the spotDL process and in the OCR engine process). curl_cffi has its own TLS engine: `_dmt_certificados_para_curl()` gives it certifi plus Windows' local server roots, without those from Microsoft's public program. If anything fails, certifi keeps being used.
+- **`build_pyinstaller.py`** generates `version_info.txt` from `version = "…"` and warns if README or CHANGELOG do not mention the version (`--version` only prints it).
+- **`innoF.iss`** reads the version from the `.exe` (`GetFileProductVersionString`), uses relative paths, `[InstallDelete]` for the previous build and `/RELANZAR=1` to reopen the app as the normal user.
+- **Dependencies:** `soundcloud-v2` is pinned to 1.6.2 (1.7.0 requires curl_cffi < 0.16, the vulnerable version).
+
+---
+---
+
 # —— Novedades v3.0 ——
 
 ---

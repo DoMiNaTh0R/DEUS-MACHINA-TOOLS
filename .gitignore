@@ -16,13 +16,15 @@ instalacion_venv_dmt.log
 .cache/
 
 # Archivos propios del autor que NO se publican
-version_info.txt          # metadatos de versión del .exe (opcional al compilar)
+# (version_info.txt lo genera build_pyinstaller.py al compilar)
+version_info.txt
 diagnostico_cuda.py
 generar_licencias.py
 licencias_extra.json
 build_nuitka.py
 
 # Cosas locales
+Instalador/
 *.whl
 *.pfx
 *.bak

@@ -1,4 +1,4 @@
-# DEUS MACHINA | TOOLS — Versión 3.0
+# DEUS MACHINA | TOOLS — Versión 3.1
 
 ---
 
@@ -14,14 +14,20 @@ Para conocer los cambios incluidos en esta versión, consulta el archivo `CHANGE
 
 ## Descarga
 
-El instalador (~1.7 GB) está en dos lugares; es el mismo archivo en ambos:
+El instalador (~1.7 GB) está en GitHub Releases:
 
 - **[Descargar desde GitHub Releases](https://github.com/DoMiNaTh0R/DEUS-MACHINA-TOOLS/releases/latest)**
-- **[Descargar desde Google Drive](https://drive.google.com/drive/folders/1Vr5GbW31KSOUGScupc5S8DhU_w5zGrFb)** (espejo)
 
 **Código fuente:** https://github.com/DoMiNaTh0R/DEUS-MACHINA-TOOLS
 
 ---
+
+## Novedades de la versión 3.1
+
+- **Parches de seguridad:** se actualizaron las librerías y herramientas afectadas por las fallas publicadas en octubre de 2026 (brotli "Node2Shell", la autoridad de certificados eMudhra, Pillow, Ghostscript 10.08.0, FFmpeg 9.0.2, Deno 2.9.8 y pypdf en lugar de PyPDF2, que estaba abandonada). Detalle en `CHANGELOG.md`.
+- **Buscador de actualizaciones:** la app revisa GitHub como máximo una vez al día y, si hay versión nueva, ofrece descargarla e instalarla (en modo silencioso o con el asistente normal). Antes de instalar comprueba la huella SHA-256 y la firma digital del instalador.
+- **Deno se mantiene al día solo**, con su huella SHA-256 verificada.
+- **Datos de la app en `%LOCALAPPDATA%\DEUS MACHINA\DeusMachinaTools`** (antes `%LOCALAPPDATA%\DeusMachinaTools`): se mueven solos la primera vez, sin perder nada.
 
 ## Novedades principales de la versión 3.0
 
@@ -90,13 +96,15 @@ Los siguientes componentes **no están incluidos** en el instalador y se descarg
 | Componente | Cuándo se descarga | Tamaño aprox. | Dónde queda |
 |---|---|---|---|
 | Modelos faster-whisper | Al usar transcripción con ese modelo | 150 MB – 3 GB según el modelo | Caché de Hugging Face (`~/.cache/huggingface/hub/`) |
-| Modelo u2net (quitar fondo) | Al usar "Remover Fondo" por primera vez | ~170 MB | `%LOCALAPPDATA%\DeusMachinaTools\rembg_models\` |
-| Deno (runtime de JavaScript) | Antes de una descarga que lo necesite | ~40 MB | `%LOCALAPPDATA%\DeusMachinaTools\tools\deno\` |
+| Modelo u2net (quitar fondo) | Al usar "Remover Fondo" por primera vez | ~170 MB | `%LOCALAPPDATA%\DEUS MACHINA\DeusMachinaTools\rembg_models\` |
+| Deno (runtime de JavaScript) | Antes de una descarga que lo necesite (después se actualiza solo) | ~40 MB | `%LOCALAPPDATA%\DEUS MACHINA\DeusMachinaTools\tools\deno\` |
 | spotDL | Al pegar el primer enlace de Spotify | ~50 MB | Entorno de la aplicación |
 
 Los modelos de OCR (PP-OCRv6 de PaddleOCR y los de RapidOCR) **sí vienen incluidos** con la aplicación, en `tools\paddleocr`.
 
 Las ejecuciones posteriores no requieren descarga.
+
+Los ajustes, los registros y la copia actualizada de yt-dlp se guardan en `%LOCALAPPDATA%\DEUS MACHINA\DeusMachinaTools` (hasta la 3.0 era `%LOCALAPPDATA%\DeusMachinaTools`; la app la mueve sola la primera vez). Lo que haya de otras apps en `DEUS MACHINA` no se toca.
 
 ---
 
@@ -108,13 +116,14 @@ La app no requiere conexión permanente a internet. Las únicas situaciones en l
 - Descarga de contenido desde YouTube, Spotify u otras plataformas compatibles (incluidos subtítulos).
 - Búsqueda de letras de canciones (LRCLIB, YouTube Music y otros proveedores), solo cuando usas esa opción.
 - Actualización de yt-dlp desde el botón integrado en la app (con verificación de firma SHA-256).
+- Búsqueda de actualizaciones de la app y de Deno en GitHub, como máximo una vez al día (y la descarga, si aceptas instalar una versión nueva).
 
 ---
 
 ## Privacidad
 
 - No se recopilan datos personales del usuario.
-- No se envía información a servidores externos propios del software.
+- No se envía información a servidores externos propios del software. La búsqueda de actualizaciones solo lee la página pública de releases de GitHub.
 - No se utiliza telemetría ni sistemas de seguimiento.
 - Todo el procesamiento de archivos se realiza localmente en el equipo del usuario.
 
@@ -127,7 +136,6 @@ DEUS MACHINA | TOOLS es **software libre** y se distribuye bajo la **GNU Affero 
 Puedes usar el programa para cualquier fin (incluido el comercial), estudiarlo, modificarlo y redistribuirlo. Si distribuyes el programa o una versión modificada —o si ofreces su funcionalidad a través de una red— debes entregar el código fuente correspondiente bajo esta misma licencia.
 
 **Código fuente:** https://github.com/DoMiNaTh0R/DEUS-MACHINA-TOOLS
-También se envía por correo a quien lo solicite: DoMiNaTh0RRoyale@gmail.com
 
 ### Por qué AGPL
 
@@ -213,7 +221,7 @@ JetBrains Mono — desarrollada por JetBrains, distribuida bajo la SIL Open Font
 ## Soporte
 
 Para soporte técnico, consultas o reporte de errores:
-**DoMiNaTh0RRoyale@gmail.com**
+**https://github.com/DoMiNaTh0R/DEUS-MACHINA-TOOLS/issues**
 
 ---
 
@@ -225,7 +233,7 @@ Kevin González (DoMiNaTh0R)
 ---
 ---
 
-# DEUS MACHINA | TOOLS — Version 3.0
+# DEUS MACHINA | TOOLS — Version 3.1
 
 ---
 
@@ -241,14 +249,20 @@ For a list of changes included in this version, refer to the `CHANGELOG.md` file
 
 ## Download
 
-The installer (~1.7 GB) is available in two places; it is the same file in both:
+The installer (~1.7 GB) is available on GitHub Releases:
 
 - **[Download from GitHub Releases](https://github.com/DoMiNaTh0R/DEUS-MACHINA-TOOLS/releases/latest)**
-- **[Download from Google Drive](https://drive.google.com/drive/folders/1Vr5GbW31KSOUGScupc5S8DhU_w5zGrFb)** (mirror)
 
 **Source code:** https://github.com/DoMiNaTh0R/DEUS-MACHINA-TOOLS
 
 ---
+
+## What's New in Version 3.1
+
+- **Security patches:** the libraries and tools affected by the flaws published in October 2026 were updated (brotli "Node2Shell", the eMudhra certificate authority, Pillow, Ghostscript 10.08.0, FFmpeg 9.0.2, Deno 2.9.8 and pypdf instead of the abandoned PyPDF2). Details in `CHANGELOG.md`.
+- **Update checker:** the app checks GitHub at most once a day and, when a new version exists, offers to download and install it (silently or with the normal wizard). Before installing it checks the installer's SHA-256 hash and digital signature.
+- **Deno keeps itself up to date**, with its SHA-256 hash verified.
+- **App data in `%LOCALAPPDATA%\DEUS MACHINA\DeusMachinaTools`** (previously `%LOCALAPPDATA%\DeusMachinaTools`): moved automatically the first time, without losing anything.
 
 ## Highlights of Version 3.0
 
@@ -317,13 +331,15 @@ The following components are **not included** in the installer and are downloade
 | Component | When it is downloaded | Approx. size | Where it is stored |
 |---|---|---|---|
 | faster-whisper models | When transcribing with that model | 150 MB – 3 GB depending on the model | Hugging Face cache (`~/.cache/huggingface/hub/`) |
-| u2net model (background removal) | First time you use "Remove Background" | ~170 MB | `%LOCALAPPDATA%\DeusMachinaTools\rembg_models\` |
-| Deno (JavaScript runtime) | Before a download that needs it | ~40 MB | `%LOCALAPPDATA%\DeusMachinaTools\tools\deno\` |
+| u2net model (background removal) | First time you use "Remove Background" | ~170 MB | `%LOCALAPPDATA%\DEUS MACHINA\DeusMachinaTools\rembg_models\` |
+| Deno (JavaScript runtime) | Before a download that needs it (then it updates itself) | ~40 MB | `%LOCALAPPDATA%\DEUS MACHINA\DeusMachinaTools\tools\deno\` |
 | spotDL | When you paste your first Spotify link | ~50 MB | Application environment |
 
 The OCR models (PaddleOCR's PP-OCRv6 and RapidOCR's own) **are included** with the application, under `tools\paddleocr`.
 
 Subsequent runs do not require a download.
+
+Settings, logs and the updated copy of yt-dlp are stored in `%LOCALAPPDATA%\DEUS MACHINA\DeusMachinaTools` (up to 3.0 it was `%LOCALAPPDATA%\DeusMachinaTools`; the app moves it by itself the first time). Anything other apps keep in `DEUS MACHINA` is left untouched.
 
 ---
 
@@ -335,13 +351,14 @@ The app does not require a permanent internet connection. The only situations in
 - Downloading content from YouTube, Spotify or other supported platforms (subtitles included).
 - Looking up song lyrics (LRCLIB, YouTube Music and other providers), only when you use that option.
 - Updating yt-dlp via the built-in button in the app (with SHA-256 signature verification).
+- Checking GitHub for app and Deno updates, at most once a day (and the download, if you accept installing a new version).
 
 ---
 
 ## Privacy
 
 - No personal user data is collected.
-- No information is sent to external servers owned by this software.
+- No information is sent to external servers owned by this software. The update check only reads GitHub's public releases page.
 - No telemetry or tracking systems are used.
 - All file processing is performed locally on the user's machine.
 
@@ -354,7 +371,6 @@ DEUS MACHINA | TOOLS is **free software**, distributed under the **GNU Affero Ge
 You may use the program for any purpose (including commercial use), study it, modify it and redistribute it. If you distribute the program or a modified version — or offer its functionality over a network — you must provide the corresponding source code under this same license.
 
 **Source code:** https://github.com/DoMiNaTh0R/DEUS-MACHINA-TOOLS
-It is also emailed to anyone who requests it: DoMiNaTh0RRoyale@gmail.com
 
 ### Why AGPL
 
@@ -440,7 +456,7 @@ JetBrains Mono — developed by JetBrains, distributed under the SIL Open Font L
 ## Support
 
 For technical support, inquiries, or bug reports:
-**DoMiNaTh0RRoyale@gmail.com**
+**https://github.com/DoMiNaTh0R/DEUS-MACHINA-TOOLS/issues**
 
 ---
 
